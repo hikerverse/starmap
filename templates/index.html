@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StarExplorer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="labels"></div>
+
+  <div id="sidebar" class="panel">
+    <h1>StarExplorer</h1>
+    <div id="star-count"></div>
+    <input type="search" id="star-search" placeholder="Search stars&hellip;" autocomplete="off">
+    <div id="list-title"></div>
+    <ul id="star-list"></ul>
+    <div class="toolbar">
+      <div class="buttons">
+        <button id="reset-view" title="Centre on Sol">Reset view</button>
+        <button id="show-all" title="Zoom out to fit every star">Show all</button>
+      </div>
+      <label class="frame-row" title="Galactic: X towards the Galactic Centre, Y towards l = 90&deg;, Z towards the North Galactic Pole (right-handed). Equatorial: J2000, X towards RA 0h, Z towards the North Celestial Pole.">
+        Frame <select id="frame-select">
+          <option value="galactic" selected>Galactic</option>
+          <option value="equatorial">Equatorial (J2000)</option>
+        </select>
+      </label>
+      <label class="frame-row" title="Colour stars by their spectral colour, or by the sovereignty they belong to (data/sovereignties.json)">
+        Colour by <select id="colour-mode">
+          <option value="spectral" selected>Star colour</option>
+          <option value="sovereignty">Sovereignty</option>
+        </select>
+      </label>
+      <div id="sovereignty-legend" hidden>
+        <label title="Hide stars that do not belong to any sovereignty"><input type="checkbox" id="toggle-unclaimed" checked> Unclaimed stars</label>
+        <ul id="sovereignty-list"></ul>
+      </div>
+      <label><input type="checkbox" id="toggle-grid" checked> Grid &amp; drop lines</label>
+      <label><input type="checkbox" id="toggle-labels" checked> Labels</label>
+      <label><input type="checkbox" id="toggle-stars" checked> Stars <span class="star-key">&#9679;</span></label>
+      <div id="class-filter" title="Spectral class filter (stars only)"></div>
+      <label><input type="checkbox" id="toggle-neutron" checked> Neutron stars <span class="neutron-key">&#10022;</span></label>
+      <label><input type="checkbox" id="toggle-blackhole" checked> Black holes <span class="blackhole-key">&#9711;</span></label>
+      <label class="distance-row" title="Only show objects within this distance of the selected star (or the rotation centre when nothing is selected). Leave empty to show everything.">
+        Show within <input type="number" id="distance-filter" min="0" step="any" placeholder="all"> pc
+      </label>
+      <div id="distance-status"></div>
+    </div>
+  </div>
+
+  <div id="details" class="panel hidden">
+    <button id="close-details" title="Close">&times;</button>
+    <h2 id="d-name"></h2>
+    <table>
+      <tr><th>Spectral class</th><td id="d-class"></td></tr>
+      <tr id="row-type" hidden><th>Type</th><td id="d-type"></td></tr>
+      <tr id="row-constellation" hidden><th>Constellation</th><td id="d-constellation"></td></tr>
+      <tr><th>Colour</th><td><span id="d-swatch" class="swatch"></span><span id="d-colour"></span></td></tr>
+      <tr><th>Absolute magnitude</th><td id="d-absmag"></td></tr>
+      <tr id="row-sovereignty" hidden><th>Sovereignty</th><td><span id="d-sov-swatch" class="swatch"></span><span id="d-sovereignty"></span></td></tr>
+      <tr><th id="h-x">X</th><td id="d-x"></td></tr>
+      <tr><th id="h-y">Y</th><td id="d-y"></td></tr>
+      <tr><th id="h-z">Z</th><td id="d-z"></td></tr>
+      <tr><th>Galactic l, b</th><td id="d-galactic"></td></tr>
+      <tr><th>Distance from Sol</th><td id="d-dist"></td></tr>
+      <tr><th>Distance from centre</th><td id="d-centre"></td></tr>
+      <tr id="row-mass" hidden><th>Mass</th><td id="d-mass"></td></tr>
+      <tr id="row-notes" hidden><th>Notes</th><td id="d-notes"></td></tr>
+    </table>
+  </div>
+
+  <div id="help" class="panel">
+    <b>Left-drag</b> rotate &middot; <b>Right-drag / Shift+drag</b> pan &middot; <b>Scroll</b> zoom<br>
+    <b>Click</b> star for details &middot; <b>Double-click</b> star to make it the centre of rotation
+    <div id="centre-info"></div>
+    <div id="scale-info"></div>
+  </div>
+
+  <script type="module" src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>

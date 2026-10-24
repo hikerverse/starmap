@@ -1,0 +1,29 @@
+{
+  "description": "Groups of stars that belong to the same sovereignty. Stars are referenced by their exact 'name' in stars.json, neutron_stars.json or black_holes.json. A star may belong to at most one sovereignty. The entries below are illustrative examples.",
+  "sovereignties": [
+    {
+      "name": "Terran Federation",
+      "colour": "#3d8bff",
+      "notes": "Example: the Sun and its closest neighbours.",
+      "stars": ["Sol", "Alpha Centauri A", "Proxima Centauri", "Barnard's Star", "Wolf 359", "Lalande 21185", "Sirius A", "Ross 154"]
+    },
+    {
+      "name": "Eridani Concord",
+      "colour": "#ff4fa3",
+      "notes": "Example group.",
+      "stars": ["Epsilon Eridani", "Tau Ceti", "Lacaille 9352", "Epsilon Ind", "Lacaille 8760", "Kapteyn's Star", "EZ Aqr", "Gl 65A"]
+    },
+    {
+      "name": "Cygnus League",
+      "colour": "#3ddc84",
+      "notes": "Example group.",
+      "stars": ["61 Cyg A", "Groombridge 34", "Struve 2398 A", "Struve 2398 B", "Ross 248", "Achird", "Chi Dra A", "Vega"]
+    },
+    {
+      "name": "Ophiuchus Directorate",
+      "colour": "#ffb02e",
+      "notes": "Example group.",
+      "stars": ["70 Oph A", "Gl 570A", "Mu Her A", "Altair", "Ross 128", "Procyon A", "Fomalhaut", "Van Maanen's Star"]
+    }
+  ]
+}
