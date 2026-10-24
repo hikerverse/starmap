@@ -1,0 +1,89 @@
+name,ids,type,ra_deg,dec_deg,distance_pc,size_arcmin,constellation,distance_ref,notes
+Orion Nebula,M42 NGC 1976,emission,83.822,-5.391,390,85,Orion,Kounkel+ 2018 (Gaia/VLBA),Nearest massive star-forming region; lit by the Trapezium cluster.
+De Mairan's Nebula,M43 NGC 1982,emission,83.879,-5.270,390,20,Orion,Kounkel+ 2018 (Gaia/VLBA),H II region around NU Ori; part of the Orion Nebula complex.
+Running Man Nebula,NGC 1977 Sh2-279,reflection,83.850,-4.833,390,20,Orion,Kounkel+ 2018 (Gaia/VLBA),
+Flame Nebula,NGC 2024 Sh2-277,emission,85.420,-1.900,400,30,Orion,Zucker+ 2020 (Orion B),Ionised by Alnitak's neighbourhood; embedded young cluster.
+Horsehead Nebula,Barnard 33,dark,85.245,-2.458,400,8,Orion,Zucker+ 2020 (Orion B),Dark pillar silhouetted against the emission nebula IC 434.
+NGC 2023,NGC 2023,reflection,85.425,-2.245,400,10,Orion,Zucker+ 2020 (Orion B),
+M78,M78 NGC 2068,reflection,86.690,0.079,400,8,Orion,Zucker+ 2020 (Orion B),Brightest reflection nebula in the sky.
+NGC 1999,NGC 1999,reflection,84.250,-6.717,390,2,Orion,Kounkel+ 2018 (Gaia/VLBA),Lit by the young star V380 Ori.
+Barnard's Loop,Sh2-276,emission,85.000,-1.000,400,600,Orion,Ochsendorf+ 2015,Huge arc of ionised gas blown out by the Orion OB1 association.
+Lambda Orionis Ring,Sh2-264,emission,83.800,9.900,400,300,Orion,Kounkel+ 2018 (Gaia),Ring of gas and dust around the Lambda Ori cluster.
+Witch Head Nebula,IC 2118,reflection,76.500,-7.200,285,180,Eridanus,Kounkel 2020 (Gaia),Lit by Rigel.
+Gum Nebula,Gum 12,emission,128.000,-43.000,450,2160,Vela/Puppis,Purcell+ 2015,"Ancient supernova remnant / H II region about 36° across, one of the largest nebulae in the sky."
+Lagoon Nebula,M8 NGC 6523,emission,270.925,-24.383,1250,90,Sagittarius,Damiani+ 2019 (Gaia DR2),
+Trifid Nebula,M20 NGC 6514,emission,270.596,-23.030,1250,28,Sagittarius,Kuhn+ 2019 (Gaia DR2),Emission + reflection + dark lanes in one object.
+Eagle Nebula,M16 NGC 6611 IC 4703,emission,274.700,-13.807,1740,35,Serpens,Kuhn+ 2019 (Gaia DR2),Home of the Pillars of Creation.
+Omega Nebula,M17 NGC 6618,emission,275.196,-16.171,1700,46,Sagittarius,Kuhn+ 2019 (Gaia DR2),Also called the Swan Nebula.
+Rosette Nebula,NGC 2237 Sh2-275,emission,97.983,4.950,1500,80,Monoceros,Kuhn+ 2019 (Gaia DR2),Shell carved by the cluster NGC 2244.
+Cone Nebula / Christmas Tree,NGC 2264 Sh2-273,emission,100.250,9.895,720,60,Monoceros,Kuhn+ 2019 (Gaia DR2),
+Hubble's Variable Nebula,NGC 2261,reflection,99.777,8.733,710,2,Monoceros,Gaia (R Mon),Fan-shaped nebula lit by R Monocerotis; varies over weeks.
+Seagull Nebula,IC 2177 Sh2-292,emission,106.000,-10.633,1000,120,Monoceros/Canis Major,Gaia DR2 (CMa R1),
+Thor's Helmet,NGC 2359,emission,109.267,-13.233,3700,16,Canis Major,Gaia (WR 7),Wind-blown bubble around the Wolf-Rayet star WR 7.
+North America Nebula,NGC 7000 Sh2-117,emission,314.750,44.333,795,120,Cygnus,Kuhn+ 2020 (Gaia),
+Pelican Nebula,IC 5070,emission,312.750,44.367,795,60,Cygnus,Kuhn+ 2020 (Gaia),Part of the same H II region as the North America Nebula.
+Crescent Nebula,NGC 6888 Sh2-105,emission,303.025,38.350,1650,18,Cygnus,Gaia (WR 136),Wind-blown shell around the Wolf-Rayet star WR 136.
+Cocoon Nebula,IC 5146 Sh2-125,emission,328.383,47.267,800,12,Cygnus,Wang+ 2020 (Gaia),
+Elephant's Trunk Nebula,IC 1396 Sh2-131,emission,324.750,57.500,925,170,Cepheus,Sicilia-Aguilar+ 2019 (Gaia),
+Cave Nebula,Sh2-155 Caldwell 9,emission,344.000,62.617,900,50,Cepheus,Gaia (Cep OB3),
+NGC 7822,NGC 7822 Sh2-171,emission,0.750,67.400,900,60,Cepheus,Gaia (Berkeley 59),
+Iris Nebula,NGC 7023,reflection,315.400,68.167,350,18,Cepheus,Gaia (HD 200775),
+Bubble Nebula,NGC 7635 Sh2-162,emission,350.200,61.200,2700,15,Cassiopeia,Gaia (BD+60 2522),Bubble blown by the O star BD+60° 2522.
+Pacman Nebula,NGC 281 Sh2-184,emission,13.200,56.617,2800,35,Cassiopeia,Gaia (IC 1590),
+Heart Nebula,IC 1805 Sh2-190,emission,38.200,61.450,2000,150,Cassiopeia,Gaia (Melotte 15),
+Soul Nebula,IC 1848 Sh2-199,emission,42.800,60.400,2000,150,Cassiopeia,Gaia (IC 1848 cluster),
+Fish Head Nebula,IC 1795,emission,36.600,62.000,2000,27,Cassiopeia,Gaia (W3),
+Wizard Nebula,NGC 7380 Sh2-142,emission,341.850,58.100,2900,25,Cepheus,Gaia (NGC 7380 cluster),
+Ghost of Cassiopeia,IC 63,emission,14.750,60.900,168,10,Cassiopeia,Gaia (Gamma Cas),Lit and eroded by Gamma Cassiopeiae.
+California Nebula,NGC 1499 Sh2-220,emission,60.200,36.617,470,145,Perseus,Gaia (Xi Per),Ionised by the runaway O star Xi Persei.
+NGC 1333,NGC 1333,reflection,52.300,31.317,295,6,Perseus,Zucker+ 2018 (Gaia),Young embedded cluster in the Perseus molecular cloud.
+Flaming Star Nebula,IC 405 Sh2-229,emission,79.070,34.267,400,30,Auriga,Gaia (AE Aur),Lit by the runaway star AE Aurigae.
+Tadpole Nebula,IC 410 Sh2-236,emission,80.600,33.500,3300,40,Auriga,Gaia (NGC 1893),
+Hind's Variable Nebula,NGC 1555,reflection,65.500,19.533,145,1,Taurus,Galli+ 2018 (Gaia/VLBA),Lit by T Tauri.
+Pleiades Nebula,NGC 1435 vdB 23,reflection,56.750,24.117,136,110,Taurus,Gaia DR2 (Pleiades),Dust cloud the Pleiades are passing through (Merope Nebula).
+Rho Ophiuchi Nebula,IC 4604 vdB 105,reflection,246.400,-23.450,139,270,Ophiuchus,Ortiz-León+ 2018 (Gaia/VLBA),Closest star-forming region to the Sun with multicoloured nebulosity.
+Antares Nebula,IC 4606,reflection,247.350,-26.433,170,60,Scorpius,Gaia (Antares),Yellow reflection nebula around Antares.
+Blue Horsehead Nebula,IC 4592,reflection,242.600,-19.400,150,150,Scorpius,Gaia (Nu Sco),Lit by Nu Scorpii.
+Corona Australis Nebula,NGC 6726 NGC 6727,reflection,285.500,-36.883,152,9,Corona Australis,Galli+ 2020 (Gaia),
+Chamaeleon Nebula,IC 2631,reflection,167.600,-76.600,190,5,Chamaeleon,Zucker+ 2019 (Gaia),Brightest nebula of the Chamaeleon I cloud.
+Carina Nebula,NGC 3372,emission,161.265,-59.867,2350,120,Carina,Göppl & Preibisch 2022 (Gaia),Home of Eta Carinae; one of the brightest H II regions in the Galaxy.
+Statue of Liberty Nebula,NGC 3576,emission,167.850,-61.300,2800,25,Carina,de Pree+ 1999,
+Running Chicken Nebula,IC 2944,emission,174.400,-63.000,2300,75,Centaurus,Gaia (IC 2944 cluster),Contains Thackeray's dark globules.
+Cat's Paw Nebula,NGC 6334,emission,260.200,-35.950,1700,40,Scorpius,Russeil+ 2012,
+War and Peace Nebula,NGC 6357,emission,261.200,-34.200,1700,50,Scorpius,Gaia (Pismis 24),
+Prawn Nebula,IC 4628,emission,254.350,-40.350,1700,60,Scorpius,Gaia (Sco OB1),
+Helix Nebula,NGC 7293,planetary,337.411,-20.837,200,25,Aquarius,Gaia EDR3,One of the closest bright planetary nebulae.
+Ring Nebula,M57 NGC 6720,planetary,283.396,33.029,790,1.4,Lyra,Gaia EDR3,
+Dumbbell Nebula,M27 NGC 6853,planetary,299.902,22.721,385,8,Vulpecula,Gaia EDR3,
+Cat's Eye Nebula,NGC 6543,planetary,269.639,66.633,1000,0.6,Draco,Gaia EDR3,
+Owl Nebula,M97 NGC 3587,planetary,168.699,55.019,870,3.4,Ursa Major,Gaia EDR3,
+Little Dumbbell Nebula,M76 NGC 650,planetary,25.582,51.575,960,2.7,Perseus,Gaia EDR3,
+Eskimo Nebula,NGC 2392,planetary,112.295,20.912,1800,0.8,Gemini,Gaia EDR3,
+Ghost of Jupiter,NGC 3242,planetary,156.192,-18.642,1500,0.7,Hydra,Gaia EDR3,
+Saturn Nebula,NGC 7009,planetary,316.044,-11.363,1250,0.6,Aquarius,Gaia EDR3,
+Blue Snowball Nebula,NGC 7662,planetary,351.475,42.535,1800,0.5,Andromeda,Gaia EDR3,
+Southern Ring Nebula,NGC 3132,planetary,151.757,-40.436,750,1.5,Vela,Gaia EDR3,Imaged by JWST in 2022.
+Spirograph Nebula,IC 418,planetary,81.866,-12.697,1300,0.2,Lepus,Gaia EDR3,
+Bug Nebula,NGC 6302,planetary,258.435,-37.103,1040,1.5,Scorpius,Meaburn+ 2008 (expansion),Butterfly-shaped; one of the hottest known central stars.
+Blinking Planetary,NGC 6826,planetary,296.200,50.525,1300,0.5,Cygnus,Gaia EDR3,
+Medusa Nebula,Abell 21 Sh2-274,planetary,112.262,13.247,580,10,Gemini,Gaia EDR3,
+NGC 1360,NGC 1360,planetary,53.310,-25.872,450,6.5,Fornax,Gaia EDR3,
+Skull Nebula,NGC 246,planetary,11.764,-11.872,550,4,Cetus,Gaia EDR3,
+Crystal Ball Nebula,NGC 1514,planetary,62.321,30.776,454,2.2,Taurus,Gaia EDR3,
+Sh2-216,Sh2-216,planetary,73.000,46.700,129,100,Perseus,Gaia EDR3,Nearest known planetary nebula; very old and faint.
+Crab Nebula,M1 NGC 1952,snr,83.633,22.015,2000,6,Taurus,Trimble 1973,"Remnant of the supernova of 1054 AD, powered by the Crab pulsar."
+Veil Nebula / Cygnus Loop,NGC 6960 NGC 6992 NGC 6995,snr,312.750,30.667,735,180,Cygnus,Fesen+ 2021 (Gaia),Supernova remnant about 10–20 thousand years old.
+Vela Supernova Remnant,Vela SNR,snr,128.500,-45.500,290,480,Vela,Dodson+ 2003,"About 11,000 years old; contains the Vela pulsar."
+Spaghetti Nebula,Simeis 147 Sh2-240,snr,85.000,28.000,1370,180,Taurus,Gaia (PSR J0538+2817),
+Jellyfish Nebula,IC 443 Sh2-248,snr,94.250,22.533,1800,50,Gemini,Yu+ 2019 (Gaia),
+Cassiopeia A,3C 461,snr,350.850,58.815,3400,5,Cassiopeia,Reed+ 1995,"Youngest known Galactic core-collapse remnant (about 1680 AD)."
+Tycho's Supernova Remnant,SN 1572 3C 10,snr,6.334,64.139,2750,8,Cassiopeia,Hayato+ 2010,Remnant of the Type Ia supernova seen by Tycho Brahe in 1572.
+Kepler's Supernova Remnant,SN 1604 3C 358,snr,262.671,-21.487,5100,3,Ophiuchus,Sankrit+ 2016,Last supernova seen in the Milky Way with the naked eye (1604).
+SN 1006,SN 1006 PKS 1459-41,snr,225.592,-41.940,2200,30,Lupus,Winkler+ 2003,Brightest supernova in recorded history.
+Puppis A,Puppis A,snr,125.500,-42.983,1300,55,Puppis,Reynoso+ 2017,
+Manatee Nebula,W50 SS 433,snr,287.958,4.983,5500,120,Aquila,Blundell & Bowler 2004,Supernova remnant distorted by the jets of the microquasar SS 433.
+Coalsack Nebula,Coalsack,dark,190.000,-63.000,190,420,Crux,Zucker+ 2020 (Gaia),The most prominent dark nebula visible to the naked eye.
+Pipe Nebula,Barnard 59 Barnard 78,dark,260.250,-26.000,163,420,Ophiuchus,Zucker+ 2020 (Gaia),
+Barnard 68,Barnard 68,dark,261.130,-23.833,150,4,Ophiuchus,Alves+ 2001,Isolated dense core (Bok globule) on the verge of collapse.
+Snake Nebula,Barnard 72,dark,265.700,-23.650,160,4,Ophiuchus,Zucker+ 2020 (Pipe),
+Dark Doodad,Musca filament,dark,187.000,-71.500,170,180,Musca,Zucker+ 2019 (Gaia),Long thin filament of dust in Musca.

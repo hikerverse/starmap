@@ -1,0 +1,53 @@
+Name,IDs,Galaxy type,Morphology,RA (J2000),Dec (J2000),Distance (Mpc),Abs mag (V),Size (arcmin),Constellation,Distance ref,Notes
+Large Magellanic Cloud,LMC,irregular,SB(s)m,05 23 34.5,-69 45 22,0.0496,-18.1,645,Dorado,Pietrzyński+ 2019 (eclipsing binaries),"Largest Milky Way satellite; home of the Tarantula Nebula and SN 1987A."
+Small Magellanic Cloud,SMC NGC 292,irregular,SB(s)m pec,00 52 44.8,-72 49 43,0.0624,-16.8,320,Tucana,Graczyk+ 2020 (eclipsing binaries),"Gas-rich dwarf irregular, tidally stretched by the LMC and the Milky Way."
+Sagittarius Dwarf Spheroidal,Sgr dSph,dwarf,dSph(t),18 55 19.5,-30 32 43,0.0267,-13.5,450,Sagittarius,McConnachie 2012,"Closest known satellite galaxy, being torn apart into a stream that wraps around the Milky Way."
+Boötes I,Boo I,dwarf,dSph,14 00 06.0,+14 30 00,0.066,-6.3,26,Boötes,McConnachie 2012,"Ultra-faint dwarf discovered in SDSS data (2006); one of the most dark-matter dominated systems known."
+Draco Dwarf,UGC 10822,dwarf,dSph,17 20 12.4,+57 54 55,0.076,-8.8,35,Draco,McConnachie 2012,Very dark-matter dominated satellite.
+Ursa Minor Dwarf,UGC 9749,dwarf,dSph,15 09 08.5,+67 13 21,0.076,-8.8,50,Ursa Minor,McConnachie 2012,One of the oldest stellar populations of any Milky Way satellite.
+Sculptor Dwarf,ESO 351-30,dwarf,dSph,01 00 09.4,-33 42 33,0.086,-11.1,40,Sculptor,McConnachie 2012,First dwarf spheroidal discovered (Shapley 1937).
+Sextans Dwarf,Sex dSph,dwarf,dSph,10 13 03.0,-01 36 53,0.086,-9.3,30,Sextans,McConnachie 2012,Very low surface brightness satellite found in 1990.
+Carina Dwarf,ESO 206-220,dwarf,dSph,06 41 36.7,-50 57 58,0.105,-9.1,23,Carina,McConnachie 2012,Shows several distinct episodes of star formation.
+Fornax Dwarf,ESO 356-04,dwarf,dSph,02 39 59.3,-34 26 57,0.147,-13.4,17,Fornax,McConnachie 2012,Brightest Milky Way dwarf spheroidal; has six globular clusters of its own.
+Leo II,UGC 6253,dwarf,dSph,11 13 28.8,+22 09 06,0.233,-9.8,12,Leo,McConnachie 2012,Distant Milky Way satellite.
+Leo I,UGC 5470,dwarf,dSph,10 08 28.1,+12 18 23,0.254,-12.0,10,Leo,McConnachie 2012,"Distant, fast-moving satellite seen right next to Regulus on the sky."
+Phoenix Dwarf,ESO 245-7,dwarf,dIrr/dSph,01 51 06.3,-44 26 41,0.415,-9.9,5,Phoenix,McConnachie 2012,Transition-type dwarf on the edge of the Local Group.
+NGC 6822,Barnard's Galaxy,irregular,IB(s)m,19 44 56.6,-14 47 21,0.459,-15.2,16,Sagittarius,McConnachie 2012,Barred dwarf irregular with bright H II regions.
+NGC 185,UGC 396,dwarf,dE3 pec,00 38 58.0,+48 20 15,0.617,-14.8,12,Cassiopeia,McConnachie 2012,Dwarf elliptical satellite of Andromeda.
+NGC 147,UGC 326,dwarf,dE5 pec,00 33 12.1,+48 30 32,0.676,-14.6,13,Cassiopeia,McConnachie 2012,Dwarf elliptical satellite of Andromeda.
+IC 1613,UGC 668,irregular,IB(s)m,01 04 47.8,+02 07 04,0.755,-15.2,16,Cetus,McConnachie 2012,Isolated dwarf irregular with very little dust.
+Andromeda Galaxy,M31 NGC 224,spiral,SA(s)b,00 42 44.3,+41 16 09,0.761,-21.5,190,Andromeda,Li+ 2021 (Cepheids),"Nearest large galaxy and the most massive member of the Local Group; will merge with the Milky Way in ~4.5 billion years."
+M32,NGC 221,elliptical,cE2,00 42 41.8,+40 51 55,0.785,-16.4,9,Andromeda,McConnachie 2012,Compact elliptical satellite of Andromeda.
+IC 10,UGC 192,irregular,dIrr,00 20 17.3,+59 18 14,0.794,-15.0,7,Cassiopeia,McConnachie 2012,The only starburst galaxy in the Local Group.
+Leo A,UGC 5364,irregular,IBm,09 59 26.5,+30 44 47,0.798,-12.1,5,Leo,McConnachie 2012,Isolated dwarf dominated by young stars.
+M110,NGC 205,elliptical,dE5 pec,00 40 22.1,+41 41 07,0.824,-16.5,22,Andromeda,McConnachie 2012,Bright dwarf elliptical satellite of Andromeda.
+Triangulum Galaxy,M33 NGC 598,spiral,SA(s)cd,01 33 50.9,+30 39 37,0.86,-18.8,70,Triangulum,Breuval+ 2023 (Cepheids),Third-largest Local Group galaxy; hosts the giant H II region NGC 604.
+Wolf-Lundmark-Melotte,WLM DDO 221,irregular,IB(s)m,00 01 58.2,-15 27 39,0.933,-14.2,12,Cetus,McConnachie 2012,Isolated dwarf irregular on the outskirts of the Local Group.
+Sextans A,UGCA 205,irregular,IBm,10 11 00.8,-04 41 34,1.43,-14.3,6,Sextans,Tully+ 2013 (Cosmicflows-2),Square-looking dwarf just beyond the Local Group.
+NGC 300,Caldwell 70,spiral,SA(s)d,00 54 53.5,-37 41 04,1.97,-18.2,22,Sculptor,Tully+ 2013 (Cosmicflows-2),Face-on spiral in the Sculptor Group.
+IC 342,Caldwell 5,spiral,SAB(rs)cd,03 46 48.5,+68 05 46,3.28,-21.1,21,Camelopardalis,Tully+ 2013 (Cosmicflows-2),"The ""Hidden Galaxy"": a large spiral dimmed by Milky Way dust."
+Maffei 1,PGC 9892,elliptical,E3,02 36 35.4,+59 39 19,3.4,-20.8,23,Cassiopeia,Wu+ 2014,"Giant elliptical behind the Milky Way plane; only found in 1968 (infrared)."
+NGC 253,Sculptor Galaxy Caldwell 65,spiral,SAB(s)c,00 47 33.1,-25 17 18,3.5,-21.2,28,Sculptor,Tully+ 2013 (Cosmicflows-2),Bright starburst spiral; the dominant member of the Sculptor Group.
+M82,Cigar Galaxy NGC 3034,irregular,I0 (starburst),09 55 52.7,+69 40 46,3.53,-19.6,11,Ursa Major,Tully+ 2013 (Cosmicflows-2),Prototype starburst galaxy with a galactic superwind; tidally disturbed by M81.
+M81,Bode's Galaxy NGC 3031,spiral,SA(s)ab,09 55 33.2,+69 03 55,3.63,-21.1,27,Ursa Major,Freedman+ 1994 (Cepheids),Grand-design spiral at the heart of the M81 Group.
+Centaurus A,NGC 5128,active,S0 pec / E,13 25 27.6,-43 01 09,3.8,-21.8,26,Centaurus,Harris+ 2010,"Nearest radio galaxy: a merger remnant with a dust lane, a 55 million M☉ black hole and kiloparsec jets."
+Circinus Galaxy,ESO 97-13,active,SA(s)b,14 13 09.9,-65 20 21,4.2,-19.9,7,Circinus,Tully+ 2009,Nearby Seyfert 2 galaxy hidden behind the Galactic plane.
+M83,Southern Pinwheel NGC 5236,spiral,SAB(s)c,13 37 00.9,-29 51 56,4.66,-20.6,13,Hydra,Tully+ 2013 (Cosmicflows-2),Barred grand-design spiral with a high supernova rate.
+M64,Black Eye Galaxy NGC 4826,spiral,(R)SA(rs)ab,12 56 43.7,+21 40 58,5.3,-20.6,10,Coma Berenices,Tully+ 2013 (Cosmicflows-2),Dark dust band in front of its bright nucleus; outer gas counter-rotates.
+M101,Pinwheel Galaxy NGC 5457,spiral,SAB(rs)cd,14 03 12.6,+54 20 57,6.9,-21.3,29,Ursa Major,Riess+ 2022 (Cepheids),Large face-on spiral; host of SN 2011fe.
+M106,NGC 4258,spiral,SAB(s)bc,12 18 57.5,+47 18 14,7.6,-21.2,19,Canes Venatici,Reid+ 2019 (water maser),Its nuclear water maser gives a geometric distance used to anchor the cosmic distance ladder.
+M51,Whirlpool Galaxy NGC 5194,interacting,SA(s)bc pec,13 29 52.7,+47 11 43,8.58,-21.4,11,Canes Venatici,McQuinn+ 2016 (TRGB),Classic grand-design spiral interacting with its companion NGC 5195.
+Sombrero Galaxy,M104 NGC 4594,spiral,SA(s)a,12 39 59.4,-11 37 23,9.55,-22.0,9,Virgo,McQuinn+ 2016 (TRGB),"Bright bulge, prominent dust lane and a billion-solar-mass central black hole."
+M74,Phantom Galaxy NGC 628,spiral,SA(s)c,01 36 41.8,+15 47 01,9.8,-20.4,10,Pisces,Tully+ 2013 (Cosmicflows-2),"Face-on grand-design spiral, imaged by JWST in 2022."
+M87,Virgo A NGC 4486,elliptical,E0-1 pec,12 30 49.4,+12 23 28,16.8,-22.6,8,Virgo,EHT Collaboration 2019,"Giant elliptical at the centre of the Virgo Cluster; its 6.5 billion M☉ black hole was the first ever imaged (2019)."
+NGC 1300,ESO 547-31,spiral,SB(rs)bc,03 19 41.1,-19 24 41,18.9,-21.0,6,Eridanus,Tully+ 2013 (Cosmicflows-2),Textbook barred spiral galaxy.
+Fornax Cluster,Abell S373 (centre NGC 1399),cluster,Galaxy cluster,03 38 29.1,-35 27 03,20.0,,,Fornax,Blakeslee+ 2009 (SBF),Richest nearby cluster after Virgo; centred on the giant elliptical NGC 1399.
+Antennae Galaxies,NGC 4038/4039,interacting,SB(s)m pec + SA(s)m pec,12 01 53.0,-18 52 10,22,-21.6,5,Corvus,Schweizer+ 2008,Pair of colliding galaxies with long tidal tails and intense star formation.
+Norma Cluster,Abell 3627,cluster,Galaxy cluster,16 15 03.0,-60 54 00,67,,,Triangulum Australe,Hubble flow (z = 0.0157; H0 = 70),"Massive cluster near the centre of the Great Attractor, partly hidden by the Milky Way."
+Perseus Cluster,Abell 426 (centre NGC 1275),cluster,Galaxy cluster,03 19 48.2,+41 30 42,77,,,Perseus,Hubble flow (z = 0.0179; H0 = 70),Brightest X-ray cluster in the sky; centred on the active galaxy NGC 1275 (Perseus A).
+Stephan's Quintet,HCG 92,interacting,Compact galaxy group,22 35 57.5,+33 57 36,92,-22.0,3,Pegasus,Hubble flow (z = 0.0215; H0 = 70),"First compact galaxy group discovered (1877); NGC 7320 in front of it is only ~13 Mpc away."
+Coma Cluster,Abell 1656,cluster,Galaxy cluster,12 59 48.7,+27 58 50,99,,,Coma Berenices,Hubble flow (z = 0.0231; H0 = 70),"Rich cluster of over 1,000 galaxies; where Zwicky first inferred dark matter (1933)."
+Cartwheel Galaxy,ESO 350-40,peculiar,S pec (ring),00 37 41.1,-33 42 59,129,-21.0,1.5,Sculptor,Hubble flow (z = 0.0300; H0 = 70),Ring galaxy formed when a smaller galaxy plunged through its disc.
+Hoag's Object,PGC 54559,peculiar,Ring galaxy,15 17 14.4,+21 35 08,182,-21.0,0.6,Serpens,Hubble flow (z = 0.0425; H0 = 70),Nearly perfect ring of young blue stars around an old yellow core.
+Cygnus A,3C 405,active,E pec (radio galaxy),19 59 28.4,+40 44 02,236,-22.0,0.5,Cygnus,Hubble flow (z = 0.0561; H0 = 70; comoving),One of the strongest radio sources in the sky; its lobes span ~140 kpc.
+3C 273,PGC 41121,active,Quasar,12 29 06.7,+02 03 09,652,-26.7,,Virgo,"Hubble flow (z = 0.158; H0 = 70, Ωm = 0.3; comoving)","First quasar identified (1963) and the optically brightest; its light left 2.0 billion years ago."

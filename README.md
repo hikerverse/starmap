@@ -46,6 +46,11 @@ axis points, and the grid lies on the frame's z = 0 plane:
 Positions are converted in the browser with the Hipparcos equatorial-to-galactic rotation matrix. The details
 panel shows X/Y/Z in the current frame plus galactic longitude and latitude (l, b).
 
+The bottom-centre panel shows the camera's live position in galactic coordinates (X, Y, Z in parsecs and
+l, b, with Sol at the origin) in either frame. It also shows how far the camera is from the selected object,
+or from the rotation centre when nothing is selected. That distance is shown in AU, pc (with light years)
+or kpc, depending on scale.
+
 Type a distance in parsecs into **Show within … pc** to only show objects (stars, neutron stars and black
 holes) within that distance of the selected star. With nothing selected, the sphere is centred on the
 rotation centre (Sol by default). Clicking another star moves the sphere to it. Clear the box to show
@@ -68,11 +73,39 @@ labelled, and listed with a ring swatch. Use the **Black holes** checkbox to hid
 beyond the HYG stars (up to ~8.6 kpc), so zoom out or double-click one in the list to fly to it. **Show all**
 still fits the HYG stars only.
 
+Nebulae are drawn as soft, noise-textured glows sized to their physical radius, plus a dashed-ring marker
+(❋) for picking. Emission nebulae and supernova remnants glow, planetary nebulae show a shell with a red
+rim, and dark clouds dim the stars behind them. Use the **Nebulae** checkbox to hide or show them all. The
+type chips (**Emission, Reflection, Planetary, SNR, Dark**) work like the spectral-class chips: click to
+toggle, double-click to show only that type. Nebulae are searchable, show up in the nearest list and respect
+the distance filter. The details panel shows catalogue IDs, size and the distance source.
+
+**Extragalactic ⬭** toggles 52 well-known galaxies and galaxy clusters, from the Magellanic Clouds out to
+3C 273 (~650 Mpc). They are drawn as tilted elliptical glows at their real distances, so zoom far out to
+see them. Click one (or search by name or catalogue ID, e.g. `M31`, `Whirlpool`) for details. They are a
+distant backdrop: double-clicking one selects it but never makes it the centre of rotation, and the
+distance filter does not hide them.
+
 **Colour by** switches between the stars' own colours and **Sovereignty**. In sovereignty mode each member
 star takes its sovereignty's colour, is drawn at least 10 px wide and is preferred for labelling. Unclaimed
 stars turn grey. A legend lists each sovereignty with its member count: click a name to fit the view to its
 members, use its checkbox to hide or show it, and untick **Unclaimed stars** to show members only. The
 details panel shows a star's sovereignty in either colour mode.
+
+**Colour by → Planets** colours every star by its planetary system:
+
+| Colour | Category |
+| --- | --- |
+| Grey | No planets |
+| Blue | Planets, none in the habitable zone |
+| Amber | A planet in the habitable zone (e.g. a gas giant or a mini-Neptune) |
+| Green | Potentially habitable: a rocky planet in the habitable zone of a suitable star |
+
+Each legend entry has a checkbox. **Confirmed planets only** restricts the map to stars with real
+exoplanets. The details panel summarises the system. **View system** opens a panel with stellar data,
+the habitable zone (conservative band in green, optimistic margins in amber), the snow line, a log-scale
+orbit diagram and a planet table. Click a planet row or dot to expand its description and moons. The
+panel follows the selection, and Esc closes it.
 
 ## Star database
 
@@ -157,6 +190,75 @@ Caveats: X-ray binary distances are often uncertain. GRO J1655-40 is quoted anyw
 GRS 1124-683 and V4641 Sgr have large uncertainties. Disputed or retracted candidates (LB-1, HR 6819, "The
 Unicorn") are deliberately left out.
 
+## Nebulae
+
+Nebulae live in [data/nebulae.json](data/nebulae.json) (under a `nebulae` key) and are served at
+`/api/nebulae`. The file holds 454 objects from three sources:
+
+| Source | Count | Contents |
+| --- | --- | --- |
+| [data/nebulae_curated.csv](data/nebulae_curated.csv) | 88 | Famous emission, reflection, planetary, supernova-remnant and dark nebulae (M42, Helix, Veil, Gum, Coalsack…) with literature distances and angular sizes |
+| González-Santamaría et al. 2021, [A&A 656, A51](https://doi.org/10.1051/0004-6361/202141916) | 272 | Planetary nebulae with Gaia EDR3 parallaxes (S/N ≥ 3, within 3 kpc), with physical radius and morphology |
+| Zucker et al. 2020, [A&A 633, A51](https://doi.org/10.1051/0004-6361/201936145) | 94 | Local molecular clouds with Gaia DR2 distances, drawn as dark clouds with one puff per measured sightline |
+
+Each entry uses the star fields (`name`, `x`, `y`, `z`, `colour`, `spectral_class` holding the type label), plus:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `nebula_type` | string | `emission`, `reflection`, `planetary`, `snr` or `dark` |
+| `type` | string | Detailed type, e.g. `H II region`, `Planetary nebula (elliptical)` |
+| `radius_pc` | number | Physical radius used for the glow |
+| `ra_deg`, `dec_deg`, `distance_pc` | number | J2000 position and distance |
+| `ids`, `constellation`, `notes` | string | Optional |
+| `distance_ref`, `distance_range_pc` | string, array | Where the distance came from and its range, if known |
+| `source` | string | Which source the entry came from |
+| `puffs` | array | Molecular clouds only: `[x, y, z, radius]` per sightline (pc, equatorial) |
+
+Regenerate it with (downloads the two VizieR tables, cached in `%TEMP%`; add `--offline` to use the cache):
+
+```powershell
+.\.venv\Scripts\python tools\import_nebulae.py
+```
+
+Curated planetary nebulae take the Gaia distance when a catalogue match within 1′ has a good parallax.
+Curated radii are `distance × tan(angular size / 2)`.
+
+Caveats: curated coordinates, distances and sizes are rounded literature values, good to roughly 5–20%.
+Nebulae are drawn as spheres, so filaments and bipolar shapes are only suggested. A molecular cloud's
+size reflects the spread of its sightline distances, so large complexes (Cygnus X, Cepheus) can look
+elongated along the line of sight.
+
+## Extragalactic objects
+
+A curated list of 52 galaxies and clusters lives in [data/galaxies.csv](data/galaxies.csv). It is converted
+to [data/galaxies.json](data/galaxies.json) (under a `galaxies` key) and served at `/api/galaxies`. It
+covers Milky Way satellites (LMC, SMC, Sagittarius, the classical dwarf spheroidals), Local Group members
+(M31, M33, M32, M110, NGC 6822, IC 1613…), nearby landmark galaxies (M81/M82, Centaurus A, M83, M101,
+M51, Sombrero, M87…), four clusters (Fornax, Norma, Perseus, Coma), and a few famous objects (Stephan's
+Quintet, the Cartwheel, Hoag's Object, Cygnus A, 3C 273).
+
+Each entry uses the star fields (`name`, `x`, `y`, `z`, `colour`, `spectral_class` holding the
+morphology), plus:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `galaxy_type` | string | `spiral`, `elliptical`, `irregular`, `dwarf`, `interacting`, `peculiar`, `active` or `cluster` (sets the marker colour) |
+| `type` | string | Readable type label |
+| `abs_mag` | number | Approximate absolute V magnitude; omitted for clusters |
+| `size_arcmin` | number | Optional major-axis angular size, shown as a physical size in kpc |
+| `ra_deg`, `dec_deg`, `distance_pc` | number | J2000 position and distance |
+| `ids`, `constellation`, `notes`, `distance_ref` | string | Catalogue IDs, location and distance source |
+
+To add or change an object, edit the CSV (RA/Dec are sexagesimal J2000, distance in Mpc) and run:
+
+```powershell
+.\.venv\Scripts\python tools\import_galaxies.py
+```
+
+Caveats: positions and distances are rounded literature values (Cepheid, TRGB and eclipsing-binary
+distances for nearby galaxies; Hubble-flow distances with H0 = 70 km/s/Mpc beyond ~20 Mpc), good to roughly
+5–15%. Galaxies are drawn as fixed-size markers, not to scale.
+
 ## Sovereignty database
 
 Sovereignties live in [data/sovereignties.json](data/sovereignties.json), separate from the star files, so
@@ -184,3 +286,82 @@ when the page loads.
 - A star can belong to at most one sovereignty. The server rejects the file (`/api/sovereignties` returns
   500) if this or any other rule is broken.
 - The entries shipped in the file are illustrative examples; replace them with your own.
+
+## Planetary systems
+
+Every star has a planetary system. Real data is used wherever it exists. All other systems are simulated
+from measured occurrence rates.
+
+**Real data**
+
+- `data/solar_system.json`: Sol's 8 planets, their major moons and minor-moon counts.
+- `data/known_planets.json`: confirmed exoplanets from the
+  [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/) `pscomppars` table, cross-matched to map
+  stars by HD/HIP/Gliese/HR ids, then by position (≤ 1,000 pc). The current match covers 913 map stars and
+  1,317 planets. For these systems, archive stellar parameters override the HYG-derived ones. Only confirmed
+  planets are shown, and their moons are simulated, since no exomoon is confirmed.
+
+**Simulation** (`systems.py`, pure Python, deterministic per star from `seed|name`)
+
+- Stellar parameters (Teff, L, M, R) come from the spectral type, luminosity class and absolute magnitude.
+- Planet counts are Poisson draws. Occurrence rates depend on spectral type, metallicity and evolutionary state:
+  - small planets: SAG13 (Kopparapu et al. 2018), Dressing & Charbonneau (2015);
+  - giant planets: Johnson et al. (2010) mass and metallicity scaling, Fulton et al. (2021)
+    semi-major-axis distribution, Cumming et al. (2008) mass function;
+  - cold Neptunes: Suzuki et al. (2016);
+  - lower rates for giants, white dwarfs and hot or massive stars.
+- Periods and radii are drawn from broken power laws. Radii follow the Fulton et al. (2017) radius valley,
+  and sizes within a system are similar, as in Weiss et al. (2018). Masses come from Chen & Kipping (2017).
+  Eccentricities follow Kipping (2013) and Van Eylen et al. (2019). Systems are spaced for Hill stability.
+- Planet types are terrestrial, super-Earth, sub-Neptune, Neptune-like/ice giant and gas giant (Jupiter, warm, hot).
+- The habitable zone follows Kopparapu et al. (2014). It is conservative (runaway–maximum greenhouse) or
+  optimistic (recent Venus–early Mars).
+- **Potentially habitable** means a rocky planet (0.25–10 M⊕, R ≤ 1.6 R⊕) in the habitable zone of a
+  main-sequence star with Teff 2,600–7,200 K.
+- Tidal locking follows Gladman et al. (1996).
+- Moons are simulated for every planet, sized by host mass (Canup & Ward 2006) and Hill radius (Domingos et
+  al. 2006). Planets too close to their star have no moons (Barnes & O'Brien 2002). Large moons of
+  habitable-zone giants can be flagged habitable.
+
+Main-sequence results (seed 1):
+
+| Host | Any planet | Gas giant | Potentially habitable (optimistic) | Potentially habitable (conservative) |
+| --- | --- | --- | --- | --- |
+| F | 71% | 19% | 6.8% | 4.4% |
+| G | 76% | 16% | 12% | 8.8% |
+| K | 82% | 13% | 13% | 9.3% |
+| M | 89% | 6.6% | 17% | 12.6% |
+
+**Files and regeneration**
+
+```powershell
+python tools\fetch_exoplanets.py [--offline]   # refresh data\known_planets.json from the archive
+python tools\generate_systems.py [--seed N]    # rebuild data\systems_summary.json and print statistics
+```
+
+See [docs/REGENERATING_SYSTEMS.md](docs/REGENERATING_SYSTEMS.md) for a step-by-step guide.
+
+`data/systems_summary.json` holds one planet count and one flag byte per star:
+
+| Bit | Flag |
+| --- | --- |
+| 1 | Gas giant |
+| 2 | Planet in HZ |
+| 4 | Potentially habitable |
+| 8 | Conservative HZ |
+| 16 | Habitable moon |
+| 32 | Confirmed planets |
+
+The app rebuilds the summary automatically, in about 4 s, if the star list, the known planets or the
+generator version change.
+
+**Endpoints**
+
+- `/api/systems-summary`: the gzipped summary.
+- `/api/system/<star name>`: the full system with planets and moons, generated on demand.
+
+**Limitations**
+
+- Some HYG entries merge close binaries, so a companion's planets can appear on the merged star. For
+  example, GJ 667 C's planets appear on "Gl 667B".
+- Archive hosts too faint for HYG are not on the map.

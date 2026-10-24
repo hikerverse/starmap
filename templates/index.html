@@ -35,15 +35,20 @@
           <option value="equatorial">Equatorial (J2000)</option>
         </select>
       </label>
-      <label class="frame-row" title="Colour stars by their spectral colour, or by the sovereignty they belong to (data/sovereignties.json)">
+      <label class="frame-row" title="Colour stars by their spectral colour, by the sovereignty they belong to (data/sovereignties.json), or by their planetary system">
         Colour by <select id="colour-mode">
           <option value="spectral" selected>Star colour</option>
           <option value="sovereignty">Sovereignty</option>
+          <option value="planets" disabled>Planets (loading&hellip;)</option>
         </select>
       </label>
       <div id="sovereignty-legend" hidden>
         <label title="Hide stars that do not belong to any sovereignty"><input type="checkbox" id="toggle-unclaimed" checked> Unclaimed stars</label>
         <ul id="sovereignty-list"></ul>
+      </div>
+      <div id="planet-legend" hidden>
+        <ul id="planet-list"></ul>
+        <label title="Only show stars with confirmed planets (NASA Exoplanet Archive) and the Solar System"><input type="checkbox" id="toggle-confirmed"> Confirmed planets only</label>
       </div>
       <label><input type="checkbox" id="toggle-grid" checked> Grid &amp; drop lines</label>
       <label><input type="checkbox" id="toggle-labels" checked> Labels</label>
@@ -51,7 +56,10 @@
       <div id="class-filter" title="Spectral class filter (stars only)"></div>
       <label><input type="checkbox" id="toggle-neutron" checked> Neutron stars <span class="neutron-key">&#10022;</span></label>
       <label><input type="checkbox" id="toggle-blackhole" checked> Black holes <span class="blackhole-key">&#9711;</span></label>
-      <label class="distance-row" title="Only show objects within this distance of the selected star (or the rotation centre when nothing is selected). Leave empty to show everything.">
+      <label><input type="checkbox" id="toggle-nebula" checked> Nebulae <span class="nebula-key">&#10059;</span></label>
+      <div id="nebula-filter" class="chip-row" title="Nebula type filter"></div>
+      <label title="Curated well-known galaxies and galaxy clusters beyond the Milky Way, at their real distances. Click one for details; they cannot be made the centre of rotation."><input type="checkbox" id="toggle-galaxy" checked> Extragalactic <span class="galaxy-key">&#11053;</span></label>
+      <label class="distance-row" title="Only show objects within this distance of the selected star (or the rotation centre when nothing is selected). Leave empty to show everything. Extragalactic objects are not affected.">
         Show within <input type="number" id="distance-filter" min="0" step="any" placeholder="all"> pc
       </label>
       <div id="distance-status"></div>
@@ -62,11 +70,13 @@
     <button id="close-details" title="Close">&times;</button>
     <h2 id="d-name"></h2>
     <table>
-      <tr><th>Spectral class</th><td id="d-class"></td></tr>
+      <tr><th id="h-class">Spectral class</th><td id="d-class"></td></tr>
       <tr id="row-type" hidden><th>Type</th><td id="d-type"></td></tr>
+      <tr id="row-ids" hidden><th>Catalogue IDs</th><td id="d-ids"></td></tr>
+      <tr id="row-size" hidden><th>Size</th><td id="d-size"></td></tr>
       <tr id="row-constellation" hidden><th>Constellation</th><td id="d-constellation"></td></tr>
       <tr><th>Colour</th><td><span id="d-swatch" class="swatch"></span><span id="d-colour"></span></td></tr>
-      <tr><th>Absolute magnitude</th><td id="d-absmag"></td></tr>
+      <tr id="row-absmag"><th id="h-absmag">Absolute magnitude</th><td id="d-absmag"></td></tr>
       <tr id="row-sovereignty" hidden><th>Sovereignty</th><td><span id="d-sov-swatch" class="swatch"></span><span id="d-sovereignty"></span></td></tr>
       <tr><th id="h-x">X</th><td id="d-x"></td></tr>
       <tr><th id="h-y">Y</th><td id="d-y"></td></tr>
@@ -74,9 +84,31 @@
       <tr><th>Galactic l, b</th><td id="d-galactic"></td></tr>
       <tr><th>Distance from Sol</th><td id="d-dist"></td></tr>
       <tr><th>Distance from centre</th><td id="d-centre"></td></tr>
+      <tr id="row-distref" hidden><th>Distance source</th><td id="d-distref"></td></tr>
       <tr id="row-mass" hidden><th>Mass</th><td id="d-mass"></td></tr>
       <tr id="row-notes" hidden><th>Notes</th><td id="d-notes"></td></tr>
+      <tr id="row-planets" hidden><th>Planets</th><td><span id="d-planets"></span><br><button id="view-system" title="Show the planetary system">View system</button></td></tr>
     </table>
+  </div>
+
+  <div id="system-panel" class="panel hidden">
+    <button id="close-system" title="Close">&times;</button>
+    <h2 id="s-title"></h2>
+    <div id="s-badge"></div>
+    <div id="s-star"></div>
+    <div id="s-hz"></div>
+    <svg id="s-diagram" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="s-table-wrap">
+      <table id="s-table">
+        <thead><tr>
+          <th>Planet</th><th>Type</th><th title="Semi-major axis">a (AU)</th><th title="Orbital period">Period</th>
+          <th title="Eccentricity">e</th><th title="Radius (Earth radii)">R&#8853;</th><th title="Mass (Earth masses)">M&#8853;</th>
+          <th title="Equilibrium temperature, albedo 0.3">T<sub>eq</sub></th><th title="Habitable zone">HZ</th><th>Moons</th>
+        </tr></thead>
+        <tbody id="s-planets"></tbody>
+      </table>
+    </div>
+    <div id="s-notes"></div>
   </div>
 
   <div id="help" class="panel">
@@ -84,6 +116,7 @@
     <b>Click</b> star for details &middot; <b>Double-click</b> star to make it the centre of rotation
     <div id="centre-info"></div>
     <div id="scale-info"></div>
+    <div id="camera-info" title="Camera position in galactic coordinates (Sol at the origin; X towards the Galactic Centre, Z towards the North Galactic Pole), and its distance from the selected object (or the rotation centre when nothing is selected)"></div>
   </div>
 
   <script type="module" src="{{ url_for('static', filename='main.js') }}"></script>

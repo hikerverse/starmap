@@ -72,7 +72,7 @@ html, body {
   padding: 3px 6px; font: inherit;
 }
 #distance-status { font-size: 11px; opacity: 0.6; }
-#class-filter { display: flex; flex-wrap: wrap; gap: 3px; padding-left: 20px; }
+#class-filter, #nebula-filter { display: flex; flex-wrap: wrap; gap: 3px; padding-left: 20px; }
 .class-chip {
   padding: 1px 6px; min-width: 22px; font-size: 11px; border-radius: 10px;
   background: transparent; color: #8a93ad; border: 1px solid #3b4f8f;
@@ -103,7 +103,8 @@ button:hover { background: #2e3f75; }
 }
 
 #help { bottom: 12px; left: 50%; transform: translateX(-50%); text-align: center; white-space: nowrap; }
-#centre-info, #scale-info { margin-top: 4px; opacity: 0.75; }
+#centre-info, #scale-info, #camera-info { margin-top: 4px; opacity: 0.75; }
+#camera-info { font-variant-numeric: tabular-nums; white-space: pre; }
 
 #labels { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 #labels[hidden] { display: none; }
@@ -125,5 +126,67 @@ button:hover { background: #2e3f75; }
 .star-key { color: #fff4e0; text-shadow: 0 0 6px #ffd9a0; font-size: 10px; }
 .blackhole-key { color: #ff9d3c; text-shadow: 0 0 6px #ff9d3c; font-size: 10px; }
 .neutron-key { color: #b48cff; text-shadow: 0 0 6px #b48cff; }
+.nebula-key { color: #ff7a9a; text-shadow: 0 0 6px #ff5a7a; }
+.star-label.nebula { color: #ffb0c4; font-style: italic; }
+#star-list li.nebula .swatch { border-radius: 50%; background: transparent !important; border: 2px dashed currentColor; width: 7px; height: 7px; }
+#star-list li.nebula .name { color: #ffc6d4; }
+.galaxy-key { color: #b8ccff; text-shadow: 0 0 6px #7f9fff; }
+.star-label.galaxy { color: #c4d4ff; font-style: italic; }
+#star-list li.galaxy .swatch { border-radius: 50%; width: 11px; height: 5px; box-shadow: 0 0 4px currentColor; }
+#star-list li.galaxy .name { color: #cdd9ff; }
+#d-ids, #d-distref { max-width: 170px; white-space: normal; }
 tr[hidden] { display: none; }
 #d-notes { max-width: 220px; white-space: normal; }
+
+/* ---------- Planets ---------- */
+#planet-legend { display: flex; flex-direction: column; gap: 4px; padding-left: 4px; }
+#planet-legend[hidden] { display: none; }
+#planet-list { list-style: none; margin: 0; padding: 0; }
+#planet-list li { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; }
+#planet-list li .swatch { flex: none; margin-right: 0; }
+#planet-list li .name { flex: 1; }
+#planet-list li .count { font-size: 11px; opacity: 0.6; }
+#planet-list li.off { opacity: 0.4; }
+#d-planets { font-size: 12px; }
+#view-system { padding: 1px 6px; font-size: 11px; margin-top: 3px; }
+#row-planets td { white-space: normal; }
+
+#system-panel {
+  top: 12px; right: 286px; width: 600px; max-width: calc(100% - 560px); max-height: calc(100% - 130px);
+  overflow-y: auto;
+}
+#system-panel h2 { margin: 0 0 4px; font-size: 17px; padding-right: 20px; }
+#close-system {
+  position: absolute; top: 6px; right: 8px; padding: 0 6px;
+  background: none; border: none; font-size: 18px;
+}
+#s-badge { margin-bottom: 6px; }
+.badge {
+  display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; margin-right: 4px;
+  border: 1px solid currentColor;
+}
+.badge.confirmed { color: #7fd1ff; }
+.badge.simulated { color: #b9a6ff; }
+.badge.habitable { color: #3ddc84; }
+#s-star, #s-hz { font-size: 12px; opacity: 0.85; margin-bottom: 3px; }
+#s-diagram { width: 100%; height: 110px; display: block; margin: 6px 0; }
+#s-diagram text { font-size: 10px; fill: #9aa6c8; }
+#s-diagram .planet-dot { cursor: pointer; }
+#s-table-wrap { overflow-x: auto; }
+#s-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+#s-table th { text-align: right; font-weight: normal; opacity: 0.7; padding: 3px 5px; border-bottom: 1px solid #2c3a66; white-space: nowrap; }
+#s-table td { text-align: right; padding: 3px 5px; white-space: nowrap; }
+#s-table th:first-child, #s-table td:first-child, #s-table th:nth-child(2), #s-table td:nth-child(2) { text-align: left; }
+#s-table tr.planet { cursor: pointer; }
+#s-table tr.planet:hover { background: rgba(120, 150, 255, 0.12); }
+#s-table tr.planet.hl { background: rgba(120, 150, 255, 0.22); }
+#s-table tr.planet.habitable td:first-child { color: #3ddc84; font-weight: 600; }
+#s-table tr.planet.hz td:first-child { color: #ffb02e; }
+#s-table tr.planet td.desc { white-space: normal; opacity: 0.75; font-size: 11px; }
+#s-table tr.moon td { font-size: 11px; opacity: 0.8; }
+#s-table tr.moon td:first-child { padding-left: 16px; }
+#s-table tr.moon.habitable td:first-child { color: #3ddc84; opacity: 1; }
+#s-table tr.detail td { text-align: left; white-space: normal; font-size: 11px; opacity: 0.75; padding: 0 5px 6px 16px; }
+#s-table .hz-c { color: #3ddc84; }
+#s-table .hz-o { color: #ffb02e; }
+#s-notes { font-size: 11px; opacity: 0.6; margin-top: 8px; }
