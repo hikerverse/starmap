@@ -74,7 +74,8 @@ beyond the HYG stars (up to ~8.6 kpc), so zoom out or double-click one in the li
 still fits the HYG stars only.
 
 Nebulae are drawn as soft, noise-textured glows sized to their physical radius, plus a dashed-ring marker
-(❋) for picking. Emission nebulae and supernova remnants glow, planetary nebulae show a shell with a red
+(❋) for picking. Emission nebulae glow, supernova remnants are faint broken shells of thin wispy filaments,
+planetary nebulae show a shell with a red
 rim, and dark clouds dim the stars behind them. Use the **Nebulae** checkbox to hide or show them all. The
 type chips (**Emission, Reflection, Planetary, SNR, Dark**) work like the spectral-class chips: click to
 toggle, double-click to show only that type. Nebulae are searchable, show up in the nearest list and respect
@@ -105,7 +106,7 @@ Each legend entry has a checkbox. **Confirmed planets only** restricts the map t
 exoplanets. The details panel summarises the system. **View system** opens a panel with stellar data,
 the habitable zone (conservative band in green, optimistic margins in amber), the snow line, a log-scale
 orbit diagram and a planet table. Click a planet row or dot to expand its description and moons. The
-panel follows the selection, and Esc closes it.
+Drag the panel's title to move it around the screen. The panel follows the selection, and Esc closes it.
 
 ## Star database
 

@@ -156,6 +156,8 @@ tr[hidden] { display: none; }
   overflow-y: auto;
 }
 #system-panel h2 { margin: 0 0 4px; font-size: 17px; padding-right: 20px; }
+#s-title { cursor: grab; touch-action: none; user-select: none; }
+#s-title.dragging { cursor: grabbing; }
 #close-system {
   position: absolute; top: 6px; right: 8px; padding: 0 6px;
   background: none; border: none; font-size: 18px;

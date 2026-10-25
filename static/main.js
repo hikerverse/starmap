@@ -33,11 +33,14 @@ const NEB_TYPES = [
   { key: 'snr', label: 'SNR', colour: '#ffa35c', title: 'Supernova remnants' },
   { key: 'dark', label: 'Dark', colour: '#9c7a5a', title: 'Dark nebulae and molecular clouds' },
 ];
+const NEB_PLANETARY = 2;
+const NEB_SNR = 3;
 const NEB_DARK = 4;
 // Label priority of nebulae, as an equivalent absolute magnitude (curated famous nebulae first)
 const NEB_LABEL_MAG = { curated: -7, 'Zucker+ 2020': -5 };
 const NEB_LABEL_MAG_DEFAULT = 1;
 const NEB_SUBPUFFS = 3;         // extra noise puffs around single-puff nebulae for a less regular shape
+const NEB_SNR_WISPS = 6;        // loose filament wisps scattered around each supernova remnant
 // Sovereignty colour mode: members are drawn at least this big and get a label bonus; others are greyed out
 const SOV_MEMBER_MIN_PX = 10;
 const SOV_BONUS_MAG = 6;
@@ -408,11 +411,24 @@ const NEBULA_FRAGMENT = /* glsl */`
     float a;
     if (vType > 3.5) {          // dark nebula / molecular cloud
       a = pow(1.0 - r, 1.3) * smoothstep(0.3, 0.75, n) * 0.55;
-    } else if (vType > 2.5) {   // supernova remnant: filamentary shell
-      float shell = smoothstep(0.3, 0.0, abs(r - 0.78 + 0.25 * (n - 0.5)));
-      float fil = pow(1.0 - abs(fbm(p * 1.8) - 0.5) * 2.0, 5.0);
-      a = shell * (0.25 + fil) * 0.8;
-      col = mix(col, vec3(0.55, 0.75, 1.0), smoothstep(0.4, 0.8, fil) * 0.4);
+    } else if (vType > 2.5) {   // supernova remnant: broken, warped shell of thin wispy filaments
+      // Domain-warp the radius so the shell isn't circular, and let it wander in thickness
+      vec2 w = vUv + 0.45 * (vec2(fbm(q * 0.5 + 1.3), fbm(q * 0.5 + 9.2)) - 0.5);
+      float rw = length(w);
+      // Angular coverage: only some arcs of the shell are lit (like the Veil / Vela segments)
+      vec2 dir = w / max(rw, 1e-3);
+      float arcs = smoothstep(0.32, 0.68, fbm(dir * 1.7 + vSeed * 13.0));
+      float band = 0.16 + 0.12 * n;
+      float shell = exp(-pow((rw - 0.66) / band, 2.0)) * arcs;
+      // Thin ridged filaments at two scales
+      float f1 = pow(1.0 - abs(fbm(p * 2.2) - 0.5) * 2.0, 9.0);
+      float f2 = pow(1.0 - abs(fbm(p * 4.3 + 5.0) - 0.5) * 2.0, 12.0);
+      float fil = f1 + 0.6 * f2;
+      float haze = 0.06 * smoothstep(0.35, 0.8, n);
+      float edge = smoothstep(1.0, 0.6, r);
+      float wisp = vType > 3.0 ? 0.0 : 1.0;   // sub-puffs (3.3) carry only loose filaments, no shell
+      a = (wisp * shell * (0.06 + 0.9 * fil) + (1.0 - wisp) * 0.35 * fil * smoothstep(0.45, 0.75, n) + haze) * edge * 0.9;
+      col = mix(col, vec3(0.55, 0.75, 1.0), smoothstep(0.3, 0.8, f2) * 0.45);
     } else if (vType > 1.5) {   // planetary nebula: bright shell, teal inside, red rim
       float shell = smoothstep(0.32, 0.0, abs(r - 0.55));
       a = (shell * 0.9 + 0.3 * (1.0 - r)) * (0.6 + 0.7 * n) * smoothstep(1.0, 0.85, r);
@@ -435,7 +451,7 @@ function makeNebulaMesh(instances, dark) {
     centre.set(p.c, 3 * k);
     radius[k] = p.r;
     colour.set(hexToRgb(records[p.owner].colour), 3 * k);
-    type[k] = specClass[p.owner];
+    type[k] = p.type ?? specClass[p.owner];
     seed[k] = p.seed;
     owners[k] = p.owner;
   });
@@ -467,6 +483,8 @@ function buildNebulae() {
   const bright = [], dark = [];
   let seed = 0.123;
   const rand = () => (seed = (seed * 9301 + 49297) % 233280 / 233280); // deterministic, so clouds look the same each load
+  let seed2 = 0.789;
+  const rand2 = () => (seed2 = (seed2 * 9301 + 49297) % 233280 / 233280);
   for (let i = firstSpecial; i < N; i++) {
     if (kind[i] !== KIND_NEBULA) continue;
     const d = records[i];
@@ -476,7 +494,21 @@ function buildNebulae() {
       continue;
     }
     out.push({ owner: i, c: [d.x, d.y, d.z], r: d.radius_pc, seed: rand() });
-    if (specClass[i] === NEB_TYPES.findIndex((t) => t.key === 'planetary')) continue; // keep a single symmetric shell
+    if (specClass[i] === NEB_PLANETARY) continue; // keep a single symmetric shell
+    // Supernova remnants get extra loose filament wisps (type 3.3: no shell) scattered around the rim
+    const snr = specClass[i] === NEB_SNR;
+    if (snr) {
+      for (let s = 0; s < NEB_SNR_WISPS; s++) {
+        const u = rand2() * 2 - 1, phi = rand2() * Math.PI * 2, q = Math.sqrt(1 - u * u);
+        const off = d.radius_pc * (0.4 + 0.35 * rand2());
+        out.push({
+          owner: i, c: [d.x + off * q * Math.cos(phi), d.y + off * q * Math.sin(phi), d.z + off * u],
+          r: d.radius_pc * (0.45 + 0.3 * rand2()), seed: rand2(), type: NEB_SNR + 0.3,
+        });
+      }
+      for (let s = 0; s < 5 * NEB_SUBPUFFS; s++) rand(); // keep the shared sequence (other nebulae's look) unchanged
+      continue;
+    }
     for (let s = 0; s < NEB_SUBPUFFS; s++) {
       const u = rand() * 2 - 1, phi = rand() * Math.PI * 2, off = d.radius_pc * 0.45, q = Math.sqrt(1 - u * u);
       out.push({
@@ -1519,7 +1551,49 @@ function updatePlanetRow(i) {
 document.getElementById('view-system').addEventListener('click', () => { if (selected >= 0) showSystem(selected); });
 document.getElementById('close-system').addEventListener('click', hideSystem);
 
+const systemPanel = document.getElementById('system-panel');
+const systemTitle = document.getElementById('s-title');
+let systemDrag = null;
+
+function positionSystemPanel(left, top) {
+  const rect = systemPanel.getBoundingClientRect();
+  systemPanel.style.left = `${Math.max(0, Math.min(left, window.innerWidth - rect.width))}px`;
+  systemPanel.style.top = `${Math.max(0, Math.min(top, window.innerHeight - rect.height))}px`;
+  systemPanel.style.right = 'auto';
+}
+
+systemTitle.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !e.isPrimary || systemDrag) return;
+  const rect = systemPanel.getBoundingClientRect();
+  systemDrag = { pointerId: e.pointerId, x: e.clientX - rect.left, y: e.clientY - rect.top };
+  systemTitle.setPointerCapture(e.pointerId);
+  systemTitle.classList.add('dragging');
+  e.preventDefault();
+});
+systemTitle.addEventListener('pointermove', (e) => {
+  if (!systemDrag || e.pointerId !== systemDrag.pointerId) return;
+  positionSystemPanel(e.clientX - systemDrag.x, e.clientY - systemDrag.y);
+});
+function stopSystemDrag() {
+  if (!systemDrag) return;
+  const { pointerId } = systemDrag;
+  systemDrag = null;
+  systemTitle.classList.remove('dragging');
+  if (systemTitle.hasPointerCapture(pointerId)) systemTitle.releasePointerCapture(pointerId);
+}
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  systemTitle.addEventListener(event, stopSystemDrag);
+}
+function keepSystemPanelInView() {
+  if (systemPanel.classList.contains('hidden') || !systemPanel.style.left) return;
+  const rect = systemPanel.getBoundingClientRect();
+  positionSystemPanel(rect.left, rect.top);
+}
+window.addEventListener('resize', keepSystemPanelInView);
+new ResizeObserver(keepSystemPanelInView).observe(systemPanel);
+
 function hideSystem() {
+  stopSystemDrag();
   systemIndex = -1;
   systemRequest++;
   document.getElementById('system-panel').classList.add('hidden');
