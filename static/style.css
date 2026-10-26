@@ -62,10 +62,19 @@ button:disabled { opacity: 0.5; cursor: default; }
 .hidden { display: none; }
 
 #sidebar {
-  top: 52px; left: 12px; width: 220px; max-height: calc(100% - 170px);
+  top: 52px; left: 12px; width: 220px; max-height: calc(100% - 216px);
   display: flex; flex-direction: column;
 }
 #sidebar h1 { font-size: 18px; margin: 0 0 2px; letter-spacing: 1px; }
+#orientation-widget {
+  bottom: 12px; left: 12px; width: 250px; height: 114px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  pointer-events: none;
+}
+#orientation-canvas { width: 104px; height: 104px; flex: none; }
+#orientation-widget h2 { font-size: 12px; margin: 0 0 6px; }
+#orientation-legend { font-size: 10px; line-height: 1.4; }
+#orientation-legend div + div { margin-top: 3px; }
 #star-count { opacity: 0.6; font-size: 12px; margin-bottom: 8px; }
 #star-search {
   background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px;
@@ -149,6 +158,14 @@ button:hover { background: #2e3f75; }
 #help { bottom: 12px; left: 50%; transform: translateX(-50%); text-align: center; white-space: nowrap; }
 #centre-info, #scale-info, #camera-info { margin-top: 4px; opacity: 0.75; }
 #camera-info { font-variant-numeric: tabular-nums; white-space: pre; }
+
+@media (max-width: 1100px) {
+  #help {
+    left: auto; right: 12px; transform: none; box-sizing: border-box;
+    max-width: calc(100% - 286px); white-space: normal;
+  }
+  #camera-info { white-space: pre-wrap; }
+}
 
 #labels { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 #labels[hidden] { display: none; }

@@ -622,49 +622,66 @@ const centreDrop = new DropLine(0xffd27a);
 const GRID_DIVISIONS = 20;
 let grid = null;
 let gridSpacing = 0;
-const axes = new THREE.AxesHelper(1);
-axes.material.transparent = true;
-axes.material.opacity = 0.7;
-axes.material.depthWrite = false;
-helpers.add(axes);
+const orientationCanvas = document.getElementById('orientation-canvas');
+const orientationContext = orientationCanvas.getContext('2d');
+const orientationLegend = document.getElementById('orientation-legend');
+const orientationColours = ['#ff8080', '#80ff80', '#80a0ff'];
+const orientationDirections = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
+const orientationProjected = orientationDirections.map(() => new THREE.Vector3());
+const orientationInverse = new THREE.Quaternion();
+const lastOrientation = new THREE.Quaternion();
+let orientationPixelRatio = 0;
 
-function makeTextSprite(colour) {
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 64;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, depthTest: false, sizeAttenuation: false,
-  }));
-  sprite.center.set(0, 0.5);
-  sprite.scale.set(0.24, 0.03, 1);
-  sprite.userData = { canvas: c, colour };
-  return sprite;
-}
-function setSpriteText(sprite, text) {
-  const { canvas, colour } = sprite.userData;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = '600 34px system-ui, sans-serif';
-  ctx.shadowColor = 'rgba(0,0,0,0.9)';
-  ctx.shadowBlur = 6;
-  ctx.fillStyle = colour;
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 8, canvas.height / 2);
-  sprite.material.map.needsUpdate = true;
-}
-// AxesHelper colours: X red, Y green, Z blue
-const axisLabels = ['#ff8080', '#80ff80', '#80a0ff'].map((colour) => {
-  const s = makeTextSprite(colour);
-  axes.add(s);
-  return s;
-});
-axisLabels[0].position.set(1.05, 0, 0);
-axisLabels[1].position.set(0, 1.05, 0);
-axisLabels[2].position.set(0, 0, 1.05);
 function updateAxisLabels() {
-  FRAMES[frame].axes.forEach((name, k) => setSpriteText(axisLabels[k], `${'XYZ'[k]} → ${name}`));
+  document.getElementById('orientation-frame').textContent = `${frame === 'galactic' ? 'Galactic' : 'Equatorial'} axes`;
+  orientationLegend.replaceChildren(...FRAMES[frame].axes.map((name, k) => {
+    const row = document.createElement('div');
+    const axis = document.createElement('b');
+    axis.style.color = orientationColours[k];
+    axis.textContent = `+${'XYZ'[k]} `;
+    row.append(axis, name);
+    return row;
+  }));
+  orientationCanvas.setAttribute('aria-label', `${frame} orientation: ${FRAMES[frame].axes.map((name, k) => `+${'XYZ'[k]} ${name}`).join(', ')}`);
 }
 updateAxisLabels();
+
+function updateOrientation() {
+  const pixelRatio = window.devicePixelRatio;
+  if (orientationPixelRatio === pixelRatio && lastOrientation.equals(camera.quaternion)) return;
+  orientationPixelRatio = pixelRatio;
+  lastOrientation.copy(camera.quaternion);
+  const size = 104;
+  if (orientationCanvas.width !== Math.round(size * pixelRatio)) {
+    orientationCanvas.width = orientationCanvas.height = Math.round(size * pixelRatio);
+  }
+  const ctx = orientationContext;
+  ctx.setTransform(orientationCanvas.width / size, 0, 0, orientationCanvas.height / size, 0, 0);
+  ctx.clearRect(0, 0, size, size);
+  orientationInverse.copy(camera.quaternion).invert();
+  orientationDirections.forEach((direction, k) => orientationProjected[k].copy(direction).applyQuaternion(orientationInverse));
+  // Draw distant axes first. Camera-space +Z points towards the viewer.
+  const order = [0, 1, 2].sort((a, b) => orientationProjected[a].z - orientationProjected[b].z);
+  ctx.font = '600 12px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const k of order) {
+    const direction = orientationProjected[k];
+    const x = 52 + direction.x * 32, y = 52 - direction.y * 32;
+    ctx.globalAlpha = direction.z < 0 ? 0.6 : 1;
+    ctx.strokeStyle = ctx.fillStyle = orientationColours[k];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(52, 52);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText('XYZ'[k], 52 + direction.x * 43, 52 - direction.y * 43);
+  }
+  ctx.globalAlpha = 1;
+}
 
 function updateGrid() {
   const dist = camera.position.distanceTo(controls.target);
@@ -682,9 +699,6 @@ function updateGrid() {
     grid.material.opacity = 0.6;
     grid.material.depthWrite = false;
     helpers.add(grid);
-    axes.scale.setScalar(spacing);
-    // Labels are fixed screen size; undo the parent scale so they don't grow with the axes
-    for (const s of axisLabels) s.scale.set(0.24 / spacing, 0.03 / spacing, 1);
     document.getElementById('scale-info').textContent = `Grid: ${FRAMES[frame].grid}, spacing ${formatPc(spacing)}`;
   }
   grid.position.set(
@@ -2077,6 +2091,7 @@ function loop(now) {
   updateGrid();
   updateLabels();
   updateCameraInfo();
+  updateOrientation();
   renderer.render(scene, camera);
 }
 

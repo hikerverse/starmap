@@ -72,8 +72,11 @@ The dependency-free filter-engine tests can be run with Node.js 22+:
 node --experimental-default-type=module tests\test_filters.mjs
 ```
 
-The **Frame** selector chooses the display coordinate system. Axis labels at the centre show which way each
-axis points, and the grid lies on the frame's z = 0 plane:
+The **Frame** selector chooses the display coordinate system. A fixed-size orientation widget below the
+sidebar in the lower-left corner shows the red X, green Y and blue Z axes and a direction legend.
+It rotates with the camera, but stays fixed when panning or zooming. The axes are not drawn over the star
+field. The widget remains visible when **Grid & drop lines** is switched off.
+The grid lies on the frame's z = 0 plane:
 
 - **Galactic** (default): right-handed. +X points to the Galactic Centre (l = 0°, b = 0°), +Y to l = 90°
   (the direction of Galactic rotation) and +Z to the North Galactic Pole. The grid is the Galactic plane.
