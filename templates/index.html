@@ -32,7 +32,10 @@
 
   <dialog id="filter-dialog" aria-labelledby="filter-title" aria-describedby="filter-help">
     <form id="filter-form">
-      <h2 id="filter-title">Object filters</h2>
+      <div class="filter-heading">
+        <h2 id="filter-title" title="Drag to move this panel">Object filters</h2>
+        <button type="button" id="filter-close" aria-label="Close filters">Close</button>
+      </div>
       <p id="filter-help">Build ALL / ANY groups. NOT excludes matches. Distance anchors stay fixed when you select another star.
         Sidebar toggles and the quick distance filter remain additional restrictions. Planet conditions use the active scenario, independently of colour mode.</p>
       <label><input type="checkbox" id="filter-galaxies"> Apply advanced filters to galaxies too (otherwise kept as a backdrop)</label>
@@ -41,9 +44,21 @@
       <div class="filter-footer">
         <button type="button" id="filter-clear">Clear rules</button>
         <span>Changes take effect only on Apply.</span>
-        <button type="button" id="filter-cancel">Cancel</button>
+        <button type="button" id="filter-cancel">Close</button>
         <button type="submit">Apply</button>
       </div>
+      <p id="filter-apply-status" role="status" aria-live="polite"></p>
+      <details id="filter-text-section">
+        <summary>Save / load filter text</summary>
+        <p>Copy the applied filter as text, keep it anywhere, and paste it back after a refresh.</p>
+        <textarea id="filter-text" rows="3" spellcheck="false" aria-label="Filter text"
+          placeholder='{"starexplorer":1,"galaxies":false,"match":"any","rules":[...]}'></textarea>
+        <div class="filter-actions">
+          <button type="button" id="filter-export">Copy filter text</button>
+          <button type="button" id="filter-import">Load &amp; apply</button>
+        </div>
+        <p id="filter-text-status" role="status" aria-live="polite"></p>
+      </details>
     </form>
   </dialog>
 
@@ -103,6 +118,11 @@
     <div>
       <h2 id="orientation-frame"></h2>
       <div id="orientation-legend"></div>
+      <div id="orientation-views" role="group" aria-label="Axis-aligned views">
+        <button type="button" data-view-plane="XY" title="Face the XY plane from +Z">XY</button>
+        <button type="button" data-view-plane="XZ" title="Face the XZ plane from -Y">XZ</button>
+        <button type="button" data-view-plane="YZ" title="Face the YZ plane from +X">YZ</button>
+      </div>
     </div>
   </section>
 
@@ -155,6 +175,7 @@
     <b>Left-drag</b> rotate &middot; <b>Right-drag / Shift+drag</b> pan &middot; <b>Scroll</b> zoom<br>
     <b>Click</b> star for details &middot; <b>Double-click</b> star to centre on it from 3 pc away
     <div id="centre-info"></div>
+    <div id="selection-distance" role="status" aria-live="polite"></div>
     <div id="scale-info"></div>
     <div id="camera-info" title="Camera position in galactic coordinates (Sol at the origin; X towards the Galactic Centre, Z towards the North Galactic Pole), and its distance from the selected object (or the rotation centre when nothing is selected)"></div>
   </div>

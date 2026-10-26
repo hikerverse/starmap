@@ -1,4 +1,4 @@
-import { emptyFilter, evaluateFilter, countConditions } from '../static/filters.js';
+import { emptyFilter, evaluateFilter, countConditions, parseFilter, serializeFilter } from '../static/filters.js';
 
 const records = [
   { name: 'X', x: 0, y: 0, z: 0 },
@@ -18,7 +18,7 @@ const data = {
 };
 const distance = (anchor, radius, negate = false) => ({ type: 'distance', anchor, radius, negate });
 const condition = (type, value, negate = false) => ({ type, value, negate });
-const group = (match, children, negate = false) => ({ type: 'group', match, children, negate });
+const group = (match, children, negate = false) => ({ type: 'group', match, negate, children });
 let passed = 0;
 function equal(actual, expected, label) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -70,6 +70,36 @@ rejects(condition('sovereignty', 5), 'Unknown sovereignty rejected');
 rejects(condition('spectral', 8), 'Unknown spectral class rejected');
 rejects(condition('planet', 4), 'Unknown planetary category rejected');
 rejects(condition('unknown', 0), 'Unknown condition rejected');
+
+const lookups = {
+  records, starCount: 5, sovereignties: data.sovereignties,
+  spectralClasses: ['O', 'B', 'A', 'F', 'G', 'K', 'M', 'Other'],
+  planetCategories: ['No planets', 'Planets', 'Planet in habitable zone', 'Potentially habitable'].map((label) => ({ label })),
+};
+const complex = group('all', [
+  group('any', [distance(0, 10), distance(4, 15.5, true)]),
+  condition('kind', 0), condition('spectral', 4, true), condition('sovereignty', 0),
+  condition('sovereignty', -1, true), condition('planet', 3), { type: 'confirmed', negate: false },
+]);
+const text = serializeFilter(complex, true, lookups);
+equal(parseFilter(text, lookups), { tree: complex, includeGalaxies: true }, 'Filter text round trip');
+equal(JSON.parse(text).rules[0].rules[0].from, 'X', 'Filter text stores star names');
+equal(parseFilter(serializeFilter(emptyFilter(), false, lookups), lookups),
+  { tree: emptyFilter(), includeGalaxies: false }, 'Empty filter text round trip');
+equal(parseFilter('{"starexplorer":1,"match":"all","rules":[{"distance":10,"from":"far","index":0}]}', lookups).tree.children[0].anchor,
+  4, 'Stale index falls back to case-insensitive name');
+function rejectsText(input, label) {
+  let rejected = false;
+  try { parseFilter(input, lookups); } catch (error) { rejected = error instanceof Error && !!error.message; }
+  equal(rejected, true, label);
+}
+rejectsText('not json', 'Invalid JSON rejected');
+rejectsText('{"match":"all","rules":[]}', 'Missing version rejected');
+rejectsText('{"starexplorer":1,"match":"all","rules":[{"distance":10,"from":"Nebula"}]}', 'Non-star anchor name rejected');
+rejectsText('{"starexplorer":1,"match":"all","rules":[{"distance":10,"from":"Nowhere"}]}', 'Unknown star rejected');
+rejectsText('{"starexplorer":1,"match":"all","rules":[{"sovereignty":"Atlantis"}]}', 'Unknown sovereignty name rejected');
+rejectsText('{"starexplorer":1,"match":"all","rules":[{"colour":"red"}]}', 'Unknown rule rejected');
+rejectsText(`{"starexplorer":1,"match":"all","rules":[${'{"match":"all","rules":['.repeat(40)}${']}'.repeat(40)}]}`, 'Deep nesting rejected');
 
 export const result = { passed };
 console.log(`Filter tests: ${passed} passed`);

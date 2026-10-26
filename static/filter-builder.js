@@ -1,13 +1,19 @@
-import { emptyFilter } from './filters.js';
+import { emptyFilter, FILTER_KINDS, parseFilter, serializeFilter } from './filters.js';
 
 export function createFilterBuilder({ records, firstSpecial, solIndex, sovereignties, spectralClasses, planetCategories, onApply }) {
   const dialog = document.getElementById('filter-dialog');
   const rules = document.getElementById('filter-rules');
   const error = document.getElementById('filter-error');
   const galaxies = document.getElementById('filter-galaxies');
+  const title = document.getElementById('filter-title');
+  const applyStatus = document.getElementById('filter-apply-status');
+  let drag = null;
   let applied = emptyFilter(), draft;
   let includeGalaxies = false;
-  const kinds = ['Star', 'Neutron star', 'Black hole', 'Nebula', 'Galaxy'];
+  const kinds = FILTER_KINDS;
+  const filterText = document.getElementById('filter-text');
+  const textStatus = document.getElementById('filter-text-status');
+  const lookups = { records, starCount: firstSpecial, sovereignties, spectralClasses, planetCategories };
   const fields = [
     ['distance', 'Distance from star'], ['kind', 'Object type'], ['spectral', 'Spectral class'],
     ['sovereignty', 'Sovereignty'], ['planet', 'Planetary category'], ['confirmed', 'Confirmed planets'],
@@ -45,6 +51,7 @@ export function createFilterBuilder({ records, firstSpecial, solIndex, sovereign
   }
   function render() {
     rules.replaceChildren(renderGroup(draft));
+    if (dialog.open) keepInView();
   }
   function renderGroup(node, remove) {
     const group = document.createElement('fieldset');
@@ -134,17 +141,34 @@ export function createFilterBuilder({ records, firstSpecial, solIndex, sovereign
   }
   document.getElementById('open-filters').addEventListener('click', () => {
     document.getElementById('view-menu').open = false;
+    if (dialog.open) {
+      document.getElementById('filter-close').focus();
+      return;
+    }
     draft = structuredClone(applied);
     galaxies.checked = includeGalaxies;
     error.textContent = '';
+    applyStatus.textContent = '';
     render();
-    dialog.showModal();
+    dialog.show();
+    const rect = dialog.getBoundingClientRect();
+    positionPanel(rect.left, rect.top);
   });
   document.getElementById('filter-cancel').addEventListener('click', () => dialog.close());
+  document.getElementById('filter-close').addEventListener('click', () => dialog.close());
+  const markUnapplied = (event) => {
+    if (event.target !== filterText) applyStatus.textContent = 'Unapplied edits. Click Apply to update the map.';
+  };
+  dialog.addEventListener('input', markUnapplied);
+  dialog.addEventListener('change', markUnapplied);
+  rules.addEventListener('click', (event) => {
+    if (event.target instanceof HTMLButtonElement) applyStatus.textContent = 'Unapplied edits. Click Apply to update the map.';
+  });
   document.getElementById('filter-clear').addEventListener('click', () => {
     draft = emptyFilter();
     galaxies.checked = false;
     error.textContent = '';
+    applyStatus.textContent = 'Rules cleared. Click Apply to update the map.';
     render();
   });
   document.getElementById('filter-form').addEventListener('submit', (event) => {
@@ -153,12 +177,79 @@ export function createFilterBuilder({ records, firstSpecial, solIndex, sovereign
       onApply(draft, galaxies.checked);
       applied = structuredClone(draft);
       includeGalaxies = galaxies.checked;
-      dialog.close();
+      error.textContent = '';
+      applyStatus.textContent = 'Filters applied. Keep editing or close this panel; applied filters stay active.';
     } catch (err) {
       error.textContent = err.message;
     }
   });
-  dialog.addEventListener('keydown', (event) => event.stopPropagation());
-  dialog.addEventListener('close', () => document.querySelector('#view-menu summary').focus());
+  document.getElementById('filter-export').addEventListener('click', async () => {
+    filterText.value = serializeFilter(applied, includeGalaxies, lookups);
+    filterText.select();
+    try {
+      await navigator.clipboard.writeText(filterText.value);
+      textStatus.textContent = 'Applied filter copied to the clipboard. Paste it here later and click Load & apply.';
+    } catch {
+      textStatus.textContent = 'Applied filter shown above (clipboard unavailable). Copy it manually.';
+    }
+  });
+  document.getElementById('filter-import').addEventListener('click', () => {
+    let parsed;
+    try {
+      parsed = parseFilter(filterText.value, lookups);
+    } catch (err) {
+      error.textContent = err.message;
+      textStatus.textContent = '';
+      return;
+    }
+    draft = parsed.tree;
+    galaxies.checked = parsed.includeGalaxies;
+    render();
+    document.getElementById('filter-form').requestSubmit();
+    textStatus.textContent = error.textContent ? 'Filter text loaded but could not be applied; see the error above.' : 'Filter text loaded and applied.';
+  });
+  function positionPanel(left, top) {
+    const rect = dialog.getBoundingClientRect();
+    dialog.style.margin = '0';
+    dialog.style.right = dialog.style.bottom = 'auto';
+    dialog.style.left = `${Math.max(0, Math.min(left, window.innerWidth - rect.width))}px`;
+    dialog.style.top = `${Math.max(0, Math.min(top, window.innerHeight - rect.height))}px`;
+  }
+  function keepInView() {
+    if (!dialog.open) return;
+    const rect = dialog.getBoundingClientRect();
+    positionPanel(rect.left, rect.top);
+  }
+  title.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !event.isPrimary || drag) return;
+    const rect = dialog.getBoundingClientRect();
+    drag = { pointerId: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
+    title.setPointerCapture(event.pointerId);
+    title.classList.add('dragging');
+    event.preventDefault();
+  });
+  title.addEventListener('pointermove', (event) => {
+    if (drag && event.pointerId === drag.pointerId) positionPanel(event.clientX - drag.x, event.clientY - drag.y);
+  });
+  function stopDrag() {
+    if (!drag) return;
+    const { pointerId } = drag;
+    drag = null;
+    title.classList.remove('dragging');
+    if (title.hasPointerCapture(pointerId)) title.releasePointerCapture(pointerId);
+  }
+  for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) title.addEventListener(event, stopDrag);
+  window.addEventListener('resize', keepInView);
+  dialog.addEventListener('keydown', (event) => {
+    event.stopPropagation();
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      dialog.close();
+    }
+  });
+  dialog.addEventListener('close', () => {
+    stopDrag();
+    document.querySelector('#view-menu summary').focus();
+  });
   document.getElementById('open-filters').disabled = false;
 }

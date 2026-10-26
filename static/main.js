@@ -1033,6 +1033,7 @@ function selectStar(i) {
   selectedDrop.set(i);
   highlightList();
   if (i < 0) {
+    updateCentreDistance();
     document.getElementById('details').classList.add('hidden');
     return;
   }
@@ -1087,10 +1088,17 @@ function selectStar(i) {
 }
 
 function updateCentreDistance() {
-  if (selected < 0) return;
+  const readout = document.getElementById('selection-distance');
+  if (selected < 0) {
+    readout.textContent = '';
+    return;
+  }
   const centreName = centre >= 0 ? records[centre].name : 'view centre';
+  const anchor = centre >= 0 ? starPos(centre) : controls.target;
+  const distance = starPos(selected).distanceTo(anchor);
   document.getElementById('d-centre').textContent =
-    `${fmtLarge(starPos(selected).distanceTo(controls.target))} (${centreName})`;
+    `${fmtLarge(distance)} (${centreName})`;
+  readout.textContent = `${records[selected].name} to ${centreName}: ${formatDistance(distance)}`;
 }
 
 function updateCentreInfo() {
@@ -1099,6 +1107,7 @@ function updateCentreInfo() {
     ? `Rotating around: ${records[centre].name}`
     : `Rotating around: (${t.x.toFixed(2)}, ${t.y.toFixed(2)}, ${t.z.toFixed(2)}) pc`;
   centreDrop.set(centre);
+  updateCentreDistance();
   labelsDirty = true;
   highlightList();
   updateFilter();
@@ -1106,6 +1115,7 @@ function updateCentreInfo() {
 
 // ---------- Smooth camera moves ----------
 let animation = null;
+let changingViewPlane = false;
 
 function animateTo(newTarget, newCamPos, onDone, instant = false) {
   animation = {
@@ -1172,6 +1182,31 @@ function showAll() {
   viewSphere(allBounds.center, Math.max(allBounds.radius, 1));
 }
 
+const PLANE_DIRECTIONS = {
+  XY: new THREE.Vector3(0, 0, 1),
+  XZ: new THREE.Vector3(0, -1, 0),
+  YZ: new THREE.Vector3(1, 0, 0),
+};
+document.querySelectorAll('[data-view-plane]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const target = controls.target.clone();
+    const distance = camera.position.distanceTo(target);
+    animation = null;
+    changingViewPlane = true;
+    const damping = controls.enableDamping;
+    // Consume residual orbit/pan motion before setting the axis-aligned view.
+    controls.enableDamping = false;
+    controls.update();
+    controls.target.copy(target);
+    camera.position.copy(target).addScaledVector(PLANE_DIRECTIONS[button.dataset.viewPlane], distance);
+    controls.update();
+    controls.enableDamping = damping;
+    changingViewPlane = false;
+    labelsDirty = true;
+    afterMove();
+  });
+});
+
 // ---------- Mouse / keyboard ----------
 let downPos = null;
 renderer.domElement.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY }; });
@@ -1200,7 +1235,7 @@ renderer.domElement.addEventListener('pointermove', (e) => {
 });
 
 controls.addEventListener('change', () => {
-  if (animation) return;
+  if (animation || changingViewPlane) return;
   // User panning moves the pivot off the star
   if (centre >= 0 && controls.target.distanceTo(starPos(centre)) > 1e-4) {
     centre = -1;
@@ -1405,7 +1440,9 @@ searchEl.addEventListener('input', () => {
   searchTimer = setTimeout(renderList, 120);
 });
 window.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || document.getElementById('filter-dialog').open) return;
+  if (e.key !== 'Escape') return;
+  const filterDialog = document.getElementById('filter-dialog');
+  if (filterDialog.open) { filterDialog.close(); return; }
   const menu = document.getElementById('view-menu');
   if (menu.open) { menu.open = false; return; }
   selectStar(-1);

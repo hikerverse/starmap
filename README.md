@@ -57,10 +57,30 @@ Distances are in parsecs and include the boundary (zero matches coincident posit
 evaluated in the original catalogue coordinates, so switching display frames cannot change the result.
 Galaxies remain an unfiltered backdrop unless **Apply advanced filters to galaxies too** is checked.
 
-**Apply** activates the rules; **Cancel** or Escape discards edits. **Clear rules**, then **Apply**,
+The filter builder is a non-blocking floating panel: drag its title to move it while continuing to
+navigate and select stars on the map. **Apply** activates the rules and leaves the panel open for
+further adjustments. **Close** or Escape closes it and discards only unapplied edits; applied filters
+stay active. Opening **View → Filters...** again restores the last applied rules and panel position.
+**Clear rules**, then **Apply**,
 disables advanced filters. Rules last for the current page session. Sidebar visibility controls and
 the existing quick distance filter are additional restrictions, not overridden by the builder.
 The top menu shows the combined visible-object count while advanced filters are active.
+
+To keep a filter across refreshes, open **Save / load filter text** in the panel. **Copy filter text**
+exports the *applied* rules (and the galaxy option) as a compact JSON string and copies it to the
+clipboard; paste it back later and click **Load & apply**. Stars and sovereignties are stored by name,
+so the text stays valid if the catalogue is rebuilt, for example:
+
+```json
+{"starexplorer":1,"galaxies":false,"match":"any","rules":[
+  {"distance":10,"from":"Sol"},{"distance":10,"from":"Deneb"}]}
+```
+
+Rules are `{"match":"all"|"any","rules":[...]}` groups or single conditions:
+`{"distance":pc,"from":"star name"}`, `{"kind":"Star"}`, `{"spectral":"G"}`,
+`{"sovereignty":"name"}` (`null` = unclaimed), `{"planet":"Potentially habitable"}` and
+`{"confirmed":true}`. Add `"not":true` to any rule or group to negate it. The optional `index` saved
+with distance rules is only a hint; the star name is authoritative, matched case-insensitively.
 
 Filter results are cached per object and uploaded as a GPU visibility attribute. Complex expressions
 are evaluated only when applied or when planetary scenario data changes, not during camera movement.
@@ -78,6 +98,10 @@ It rotates with the camera, but stays fixed when panning or zooming. The axes ar
 field. The widget remains visible when **Grid & drop lines** is switched off.
 The grid lies on the frame's z = 0 plane:
 
+The **XY**, **XZ** and **YZ** buttons beside the orientation axes snap the camera to face that plane
+in the selected frame, preserving the current rotation centre and camera distance. XY looks from +Z,
+XZ from -Y and YZ from +X. These are axis-aligned camera views; the perspective projection is unchanged.
+
 - **Galactic** (default): right-handed. +X points to the Galactic Centre (l = 0°, b = 0°), +Y to l = 90°
   (the direction of Galactic rotation) and +Z to the North Galactic Pole. The grid is the Galactic plane.
 - **Equatorial (J2000)**: the frame the JSON files are stored in. +X points to RA 0h, +Y to RA 6h and +Z to
@@ -90,6 +114,12 @@ The bottom-centre panel shows the camera's live position in galactic coordinates
 l, b, with Sol at the origin) in either frame. It also shows how far the camera is from the selected object,
 or from the rotation centre when nothing is selected. That distance is shown in AU, pc (with light years)
 or kpc, depending on scale.
+
+Single-clicking a star also shows **selected star to rotation-centre star** in the bottom-centre
+panel, separately from the camera distance. The details panel shows the same separation under
+**Distance from centre**. This uses the centre star's position even during a camera move.
+After panning away from a star, the separation is measured to the free view centre instead.
+Clearing the selection hides this readout.
 
 Type a distance in parsecs into **Show within … pc** to only show objects (stars, neutron stars and black
 holes) within that distance of the selected star. With nothing selected, the sphere is centred on the

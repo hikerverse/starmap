@@ -23,11 +23,16 @@ html, body {
 .menu-commands button { text-align: left; }
 #advanced-filter-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }
 #filter-dialog {
+  position: fixed; z-index: 11; box-sizing: border-box;
   color: #dde6ff; background: #0a1020; border: 1px solid #3b4f8f; border-radius: 8px;
   width: min(780px, calc(100vw - 48px)); max-height: calc(100dvh - 64px); padding: 18px; overflow: auto;
 }
-#filter-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
 #filter-dialog h2 { margin: 0; }
+.filter-heading { display: flex; align-items: center; gap: 12px; }
+#filter-title { flex: 1; cursor: grab; touch-action: none; user-select: none; }
+#filter-title.dragging { cursor: grabbing; }
+#filter-apply-status { font-size: 12px; color: #aebbdc; }
+#filter-apply-status:empty { display: none; }
 #filter-help, #filter-dialog small, .filter-footer span { font-size: 12px; color: #aebbdc; }
 #filter-dialog input:not([type="checkbox"]), #filter-dialog select {
   background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px;
@@ -46,6 +51,13 @@ html, body {
 .filter-footer span { flex: 1; }
 #filter-error { color: #ffb3b3; }
 #filter-error:empty { display: none; }
+#filter-text-section { margin-top: 8px; font-size: 12px; color: #aebbdc; }
+#filter-text-section summary { cursor: pointer; color: #dde6ff; }
+#filter-text {
+  box-sizing: border-box; width: 100%; resize: vertical; font: 11px/1.4 ui-monospace, Consolas, monospace;
+  background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px; padding: 4px;
+}
+#filter-text-status:empty { display: none; }
 button:disabled { opacity: 0.5; cursor: default; }
 :focus-visible { outline: 2px solid #9bb0ff; outline-offset: 2px; }
 
@@ -75,6 +87,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 #orientation-widget h2 { font-size: 12px; margin: 0 0 6px; }
 #orientation-legend { font-size: 10px; line-height: 1.4; }
 #orientation-legend div + div { margin-top: 3px; }
+#orientation-views { display: flex; gap: 4px; margin-top: 5px; pointer-events: auto; }
+#orientation-views button { padding: 2px 5px; font-size: 11px; }
 #star-count { opacity: 0.6; font-size: 12px; margin-bottom: 8px; }
 #star-search {
   background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px;
@@ -157,6 +171,8 @@ button:hover { background: #2e3f75; }
 
 #help { bottom: 12px; left: 50%; transform: translateX(-50%); text-align: center; white-space: nowrap; }
 #centre-info, #scale-info, #camera-info { margin-top: 4px; opacity: 0.75; }
+#selection-distance { margin-top: 4px; font-variant-numeric: tabular-nums; color: #ffd27a; }
+#selection-distance:empty { display: none; }
 #camera-info { font-variant-numeric: tabular-nums; white-space: pre; }
 
 @media (max-width: 1100px) {
