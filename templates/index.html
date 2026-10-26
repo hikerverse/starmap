@@ -18,6 +18,35 @@
   <div id="canvas-container"></div>
   <div id="labels"></div>
 
+  <nav id="top-menu" aria-label="Application menu">
+    <details id="view-menu">
+      <summary>View</summary>
+      <div class="menu-commands">
+        <button id="open-filters" disabled>Filters...</button>
+        <button id="reset-view" title="Centre on Sol">Reset view</button>
+        <button id="show-all" title="Zoom out to fit every star">Show all</button>
+      </div>
+    </details>
+    <span id="advanced-filter-status" role="status" aria-live="polite">Advanced filters off</span>
+  </nav>
+
+  <dialog id="filter-dialog" aria-labelledby="filter-title" aria-describedby="filter-help">
+    <form id="filter-form">
+      <h2 id="filter-title">Object filters</h2>
+      <p id="filter-help">Build ALL / ANY groups. NOT excludes matches. Distance anchors stay fixed when you select another star.
+        Sidebar toggles and the quick distance filter remain additional restrictions. Planet conditions use the active scenario, independently of colour mode.</p>
+      <label><input type="checkbox" id="filter-galaxies"> Apply advanced filters to galaxies too (otherwise kept as a backdrop)</label>
+      <div id="filter-rules"></div>
+      <p id="filter-error" role="alert"></p>
+      <div class="filter-footer">
+        <button type="button" id="filter-clear">Clear rules</button>
+        <span>Changes take effect only on Apply.</span>
+        <button type="button" id="filter-cancel">Cancel</button>
+        <button type="submit">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="sidebar" class="panel">
     <h1>StarExplorer</h1>
     <div id="star-count"></div>
@@ -25,10 +54,6 @@
     <div id="list-title"></div>
     <ul id="star-list"></ul>
     <div class="toolbar">
-      <div class="buttons">
-        <button id="reset-view" title="Centre on Sol">Reset view</button>
-        <button id="show-all" title="Zoom out to fit every star">Show all</button>
-      </div>
       <label class="frame-row" title="Galactic: X towards the Galactic Centre, Y towards l = 90&deg;, Z towards the North Galactic Pole (right-handed). Equatorial: J2000, X towards RA 0h, Z towards the North Celestial Pole.">
         Frame <select id="frame-select">
           <option value="galactic" selected>Galactic</option>

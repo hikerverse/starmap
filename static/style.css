@@ -9,6 +9,46 @@ html, body {
 
 #canvas-container { position: fixed; inset: 0; }
 
+#top-menu {
+  position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 10;
+  display: flex; align-items: center; gap: 16px; padding: 0 12px;
+  background: #0a1020; border-bottom: 1px solid #3b4f8f; font-size: 13px;
+}
+#view-menu summary { cursor: pointer; padding: 6px; }
+.menu-commands {
+  position: absolute; top: 38px; left: 12px; min-width: 170px;
+  display: flex; flex-direction: column; gap: 4px; padding: 6px;
+  background: #0a1020; border: 1px solid #3b4f8f; border-radius: 4px;
+}
+.menu-commands button { text-align: left; }
+#advanced-filter-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }
+#filter-dialog {
+  color: #dde6ff; background: #0a1020; border: 1px solid #3b4f8f; border-radius: 8px;
+  width: min(780px, calc(100vw - 48px)); max-height: calc(100dvh - 64px); padding: 18px; overflow: auto;
+}
+#filter-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+#filter-dialog h2 { margin: 0; }
+#filter-help, #filter-dialog small, .filter-footer span { font-size: 12px; color: #aebbdc; }
+#filter-dialog input:not([type="checkbox"]), #filter-dialog select {
+  background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px;
+  padding: 5px; font: inherit; min-width: 0; max-width: 100%; box-sizing: border-box;
+}
+#filter-rules { margin-top: 12px; }
+.filter-group { border: 1px solid #3b4f8f; border-radius: 6px; margin: 8px 0; min-width: 0; }
+.filter-actions, .filter-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filter-condition {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 10px 0; padding: 10px; background: #151f3b; border-radius: 4px;
+}
+.filter-condition input[type="number"] { width: 110px; }
+.filter-condition small { flex-basis: 100%; }
+.filter-footer { margin-top: 12px; }
+.filter-footer span { flex: 1; }
+#filter-error { color: #ffb3b3; }
+#filter-error:empty { display: none; }
+button:disabled { opacity: 0.5; cursor: default; }
+:focus-visible { outline: 2px solid #9bb0ff; outline-offset: 2px; }
+
 .panel {
   position: fixed;
   background: rgba(10, 16, 32, 0.82);
@@ -22,7 +62,7 @@ html, body {
 .hidden { display: none; }
 
 #sidebar {
-  top: 12px; left: 12px; width: 220px; max-height: calc(100% - 130px);
+  top: 52px; left: 12px; width: 220px; max-height: calc(100% - 170px);
   display: flex; flex-direction: column;
 }
 #sidebar h1 { font-size: 18px; margin: 0 0 2px; letter-spacing: 1px; }
@@ -91,7 +131,7 @@ button {
 }
 button:hover { background: #2e3f75; }
 
-#details { top: 12px; right: 12px; width: 260px; }
+#details { top: 52px; right: 12px; width: 260px; }
 #details h2 { margin: 0 0 8px; font-size: 17px; }
 #details table { width: 100%; border-collapse: collapse; }
 #details th { text-align: left; font-weight: normal; opacity: 0.7; padding: 2px 6px 2px 0; }
@@ -156,7 +196,7 @@ tr[hidden] { display: none; }
 #row-planets td { white-space: normal; }
 
 #system-panel {
-  top: 12px; right: 286px; width: 600px; max-width: calc(100% - 560px); max-height: calc(100% - 130px);
+  top: 52px; right: 286px; width: 600px; max-width: calc(100% - 560px); max-height: calc(100% - 170px);
   overflow-y: auto;
 }
 #system-panel h2 { margin: 0 0 4px; font-size: 17px; padding-right: 20px; }

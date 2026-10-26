@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { emptyFilter, evaluateFilter, countConditions } from './filters.js';
+import { createFilterBuilder } from './filter-builder.js';
 
 // ---------- Tunables ----------
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
@@ -183,10 +185,31 @@ let planetCat = null;      // Int8Array(N): index into PLANET_CATS
 let planetColours = null;
 const planetVisible = PLANET_CATS.map(() => true);
 let confirmedOnly = false;
+let advancedFilter = emptyFilter();
+let filterGalaxies = false;
+let advancedMask = null, advancedMaskAttr = null;
+
+function filterData() {
+  return { records, kind, specClass, sovOf, sovereignties, planetCat, planetFlags };
+}
+
+function refreshAdvancedMask() {
+  advancedMask.set(evaluateFilter(advancedFilter, filterData(), filterGalaxies));
+  advancedMaskAttr.needsUpdate = true;
+}
+
+function applyAdvancedFilter(tree, includeGalaxies) {
+  const mask = evaluateFilter(tree, filterData(), includeGalaxies);
+  advancedFilter = structuredClone(tree);
+  filterGalaxies = includeGalaxies;
+  advancedMask.set(mask);
+  advancedMaskAttr.needsUpdate = true;
+  visibilityChanged();
+}
 
 const isHidden = (i) => !kindVisible[kind[i]] || (kind[i] === 0 && !classVisible[specClass[i]])
   || (kind[i] === KIND_NEBULA && !nebTypeVisible[specClass[i]])
-  || sovState[i] === SOV_HIDDEN || outsideFilter(i);
+  || sovState[i] === SOV_HIDDEN || !advancedMask[i] || outsideFilter(i);
 // Neutron stars and black holes: always labelled when on screen
 const isCompactSpecial = (i) => kind[i] === KIND_NEUTRON || kind[i] === KIND_BLACK_HOLE;
 const starSizePx = (i, dist) =>
@@ -222,6 +245,7 @@ const starMaterial = new THREE.ShaderMaterial({
     attribute float kind;
     attribute float sovState;
     attribute float specClass;
+    attribute float filterVisible;
     uniform float uClassVisible[${SPEC_CLASSES.length}];
     uniform float uPixelRatio;
     uniform float uShowStar;
@@ -239,7 +263,7 @@ const starMaterial = new THREE.ShaderMaterial({
       vKind = kind;
       bool isNebula = kind > 2.5 && kind < 3.5;
       bool isGalaxy = kind > 3.5;
-      if ((kind < 0.5 && uShowStar < 0.5) || (kind > 0.5 && kind < 1.5 && uShowNeutron < 0.5)
+      if (filterVisible < 0.5 || (kind < 0.5 && uShowStar < 0.5) || (kind > 0.5 && kind < 1.5 && uShowNeutron < 0.5)
           || (kind > 1.5 && kind < 2.5 && uShowBlackHole < 0.5) || (isNebula && uShowNebula < 0.5)
           || (isGalaxy && uShowGalaxy < 0.5)
           || (sovState > 0.5 && sovState < 1.5)
@@ -343,6 +367,8 @@ function buildPoints() {
   sovStateAttr = new THREE.BufferAttribute(sovState, 1);
   geo.setAttribute('sovState', sovStateAttr);
   geo.setAttribute('specClass', new THREE.BufferAttribute(new Float32Array(specClass), 1));
+  advancedMaskAttr = new THREE.BufferAttribute(advancedMask, 1);
+  geo.setAttribute('filterVisible', advancedMaskAttr);
   geo.computeBoundingSphere();
   const points = new THREE.Points(geo, starMaterial);
   points.frustumCulled = false;
@@ -974,6 +1000,12 @@ function updateFilter(force = false) {
   } else {
     status.textContent = '';
   }
+  const conditions = countConditions(advancedFilter);
+  let visible = 0;
+  if (conditions) for (let i = 0; i < N; i++) if (!isHidden(i)) visible++;
+  document.getElementById('advanced-filter-status').textContent = conditions
+    ? `${conditions} advanced condition${conditions === 1 ? '' : 's'} · ${visible.toLocaleString()} objects visible`
+    : 'Advanced filters off';
   labelsDirty = true;
   renderList();
 }
@@ -1161,8 +1193,18 @@ controls.addEventListener('change', () => {
 });
 controls.addEventListener('end', scheduleListRefresh);
 
-document.getElementById('reset-view').addEventListener('click', () => resetView());
-document.getElementById('show-all').addEventListener('click', showAll);
+document.getElementById('reset-view').addEventListener('click', () => {
+  document.getElementById('view-menu').open = false;
+  resetView();
+});
+document.getElementById('show-all').addEventListener('click', () => {
+  document.getElementById('view-menu').open = false;
+  showAll();
+});
+document.addEventListener('pointerdown', (event) => {
+  const menu = document.getElementById('view-menu');
+  if (!menu.contains(event.target)) menu.open = false;
+});
 document.getElementById('close-details').addEventListener('click', () => selectStar(-1));
 document.getElementById('toggle-grid').addEventListener('change', (e) => { helpers.visible = e.target.checked; });
 document.getElementById('toggle-labels').addEventListener('change', (e) => {
@@ -1345,7 +1387,13 @@ searchEl.addEventListener('input', () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(renderList, 120);
 });
-window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { selectStar(-1); hideSystem(); } });
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || document.getElementById('filter-dialog').open) return;
+  const menu = document.getElementById('view-menu');
+  if (menu.open) { menu.open = false; return; }
+  selectStar(-1);
+  hideSystem();
+});
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -1382,6 +1430,7 @@ async function init() {
   absMag = new Float32Array(N);
   isNamed = new Uint8Array(N);
   kind = new Uint8Array(N);
+  advancedMask = new Uint8Array(N).fill(1);
   specClass = new Uint8Array(N);
   labelWidth = new Float32Array(N);
   scrX = new Float32Array(N);
@@ -1415,6 +1464,10 @@ async function init() {
   buildNebulaFilter();
   buildPoints();
   buildNebulae();
+  createFilterBuilder({
+    records, firstSpecial, solIndex, sovereignties, spectralClasses: SPEC_CLASSES,
+    planetCategories: PLANET_CATS, onApply: applyAdvancedFilter,
+  });
   computeBounds();
   document.getElementById('star-count').textContent =
     [`${db.stars.length.toLocaleString()} stars`, ...counts].join(' · ');
@@ -1607,6 +1660,7 @@ async function loadPlanets(scenario) {
     scenariosLoading = false;
     scenarioSelect.value = scenario.id;
     setScenarioStatus(`${scenario.name} · ${scenario.revision.slice(0, 8)}`);
+    refreshAdvancedMask();
     renderPlanetLegend();
     applyColourState();
     if (selected >= 0) updatePlanetRow(selected);

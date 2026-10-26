@@ -35,6 +35,43 @@ ahead of catalogue ids). Zoom in to reveal more. The grid rescales with zoom (sp
 
 The sidebar lists the 25 stars nearest the rotation centre; type in the search box to find stars by name.
 
+### Advanced filters
+
+Open **View → Filters...** in the top menu to build a set of conditions. The builder is hidden until
+opened; **Reset view** and **Show all** are also in the View menu.
+
+- **ALL (AND)** requires every condition to match. For example, within 10 pc of Star X AND within 15 pc
+  of Star Y shows the overlap of the two spheres.
+- **ANY (OR)** accepts either condition. Use it for separate neighbourhoods, for example within 10 pc
+  of Sol OR within 10 pc of Vega, even when the spheres do not overlap. Add nested groups to combine AND and OR.
+- **NOT** excludes matches to a condition or a whole group.
+- Conditions support distance from a reference star, object type, spectral class, sovereignty,
+  planetary category and confirmed planets. Planetary conditions use the active scenario even when
+  the map is not coloured by planets; spectral, sovereignty and planet conditions match stars only
+  before NOT is applied.
+
+Reference-star search uses the whole star catalogue, including hidden stars. Choose a result from
+the reference-star selector; typing a search alone does not change the centre. Each distance rule
+shows its chosen centre, which stays fixed when selecting or centring other stars.
+Distances are in parsecs and include the boundary (zero matches coincident positions). They are
+evaluated in the original catalogue coordinates, so switching display frames cannot change the result.
+Galaxies remain an unfiltered backdrop unless **Apply advanced filters to galaxies too** is checked.
+
+**Apply** activates the rules; **Cancel** or Escape discards edits. **Clear rules**, then **Apply**,
+disables advanced filters. Rules last for the current page session. Sidebar visibility controls and
+the existing quick distance filter are additional restrictions, not overridden by the builder.
+The top menu shows the combined visible-object count while advanced filters are active.
+
+Filter results are cached per object and uploaded as a GPU visibility attribute. Complex expressions
+are evaluated only when applied or when planetary scenario data changes, not during camera movement.
+Picking, labels, search, the nearest list and nebula clouds all use the same cached result.
+
+The dependency-free filter-engine tests can be run with Node.js 22+:
+
+```powershell
+node --experimental-default-type=module tests\test_filters.mjs
+```
+
 The **Frame** selector chooses the display coordinate system. Axis labels at the centre show which way each
 axis points, and the grid lies on the frame's z = 0 plane:
 
