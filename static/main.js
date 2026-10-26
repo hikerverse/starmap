@@ -7,6 +7,7 @@ import { createFilterBuilder } from './filter-builder.js';
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
 const CLICK_MOVE_TOLERANCE = 5; // pixels of movement before a press counts as a drag
 const FOCUS_DURATION_MS = 700;
+const FOCUS_DISTANCE_PC = 3;
 const MAX_LABELS = 60;
 const LABEL_CANDIDATES = 400;   // brightest on-screen stars considered for labels
 const NAMED_BONUS_MAG = 3;      // proper names get labelled ahead of catalogue ids
@@ -1142,8 +1143,10 @@ function focusStar(i) {
     selectStar(i);
     return;
   }
-  // Keep current viewing direction and distance; just move the pivot to the star
+  // Keep the viewing direction, but arrive at a consistent distance from the star.
   const offset = camera.position.clone().sub(controls.target);
+  if (offset.lengthSq() === 0) offset.set(0, 0, 1).applyQuaternion(camera.quaternion);
+  offset.setLength(FOCUS_DISTANCE_PC);
   const p = starPos(i);
   centre = i;
   selectStar(i);

@@ -23,7 +23,7 @@ The ~12 MB star file is served gzip-compressed (~2.8 MB) and cached in memory un
 | Right-drag / Shift+drag / arrow keys | Pan |
 | Scroll wheel | Zoom |
 | Click a star (or list entry) | Show star details |
-| Double-click a star (or list entry) | Make it the centre of rotation |
+| Double-click a star (or list entry) | Centre on it and move the camera to 3 pc away, keeping the viewing direction |
 | Reset view | Centre on Sol, 12 pc away |
 | Show all | Zoom out to fit every star |
 | Esc | Close details |
