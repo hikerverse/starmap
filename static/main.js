@@ -48,7 +48,7 @@ const UNCLAIMED_COLOUR = '#4a5060';
 // Per-star sovereignty state (shader attribute `sovState`)
 const SOV_NORMAL = 0, SOV_HIDDEN = 1, SOV_MEMBER = 2;
 // Planets colour mode (data from /api/systems-summary; flag bits match systems.py)
-const PF_GIANT = 1, PF_HZ = 2, PF_HABITABLE = 4, PF_CONSERVATIVE = 8, PF_HAB_MOON = 16, PF_CONFIRMED = 32;
+const PF_GIANT = 1, PF_HZ = 2, PF_HABITABLE = 4, PF_CONSERVATIVE = 8, PF_HAB_MOON = 16, PF_CONFIRMED = 32, PF_MANUAL = 64;
 const PLANET_CATS = [
   { label: 'No planets', colour: '#4a5060', title: 'No planets found or simulated' },
   { label: 'Planets', colour: '#5b7cfa', title: 'Has planets, none in the habitable zone' },
@@ -1364,6 +1364,7 @@ async function init() {
   const res = responses[0];
   if (!res.ok) throw new Error(`Failed to load stars (${res.status})`);
   const db = await res.json();
+  catalogueFingerprint = db.catalogue_fingerprint;
   records = db.stars.slice();
   const kinds = [];
   const counts = [];
@@ -1421,7 +1422,7 @@ async function init() {
   resetView(true);
   stepAnimation(performance.now());
   renderList();
-  loadPlanets();
+  loadScenarios();
 }
 
 // Resolve sovereignty membership with a single pass over the catalogue (only member names are hashed)
@@ -1461,14 +1462,132 @@ const PLANET_TYPE_COLOURS = {
 };
 let systemIndex = -1;
 let systemRequest = 0;
+let scenarioRequest = 0;
+let activeScenario = null;
+let scenarioCatalogue = null;
+let catalogueFingerprint = null;
+let scenarios = [];
+let scenariosLoading = false;
+const scenarioSelect = document.getElementById('scenario-select');
+const scenarioStatus = document.getElementById('scenario-status');
 
-async function loadPlanets() {
+function catalogueNamesCrc() {
+  let crc = 0xffffffff;
+  const bytes = new TextEncoder().encode(records.slice(0, firstSpecial).map((s) => s.name).join('\n'));
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+async function scenarioJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `HTTP ${res.status}`;
+    if (res.headers.get('content-type')?.includes('application/json')) {
+      const body = JSON.parse(text);
+      message = body.error ?? body.message ?? message;
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+function scenarioUrl(path, scenario) {
+  const query = new URLSearchParams({ scenario: scenario.id, revision: scenario.revision });
+  return `${path}?${query}`;
+}
+
+function setScenarioStatus(message, error = false) {
+  scenarioStatus.textContent = message;
+  scenarioStatus.classList.toggle('error', error);
+}
+
+scenarioSelect.addEventListener('change', () => {
+  const scenario = scenarios.find((s) => s.id === scenarioSelect.value);
+  if (scenario) loadPlanets(scenario);
+});
+document.getElementById('reload-scenarios').addEventListener('click', loadScenarios);
+
+async function loadScenarios() {
+  const request = ++scenarioRequest;
+  scenariosLoading = true;
+  systemRequest++;
+  scenarioSelect.disabled = true;
+  setScenarioStatus('Loading published scenarios...');
+  if (selected >= 0) updatePlanetRow(selected);
+  try {
+    const catalogue = await scenarioJson('/api/scenarios');
+    if (request !== scenarioRequest) return;
+    if (catalogue.names_crc !== catalogueNamesCrc() || !catalogueFingerprint
+      || catalogue.catalogue_fingerprint !== catalogueFingerprint) {
+      throw new Error('Scenarios do not match this star catalogue. Reload the page.');
+    }
+    if (!catalogue.scenarios?.length) throw new Error('No published scenarios. Create a snapshot with tools\\manage_scenarios.py.');
+    scenarios = catalogue.scenarios;
+    scenarioCatalogue = catalogue;
+    scenarioSelect.replaceChildren(...scenarios.map((s) => {
+      const option = document.createElement('option');
+      option.value = s.id;
+      option.textContent = s.name;
+      return option;
+    }));
+    const scenario = scenarios.find((s) => s.id === activeScenario?.id)
+      ?? scenarios.find((s) => s.id === catalogue.default_scenario);
+    if (!scenario) throw new Error('Default scenario is not published.');
+    scenarioSelect.value = scenario.id;
+    await loadPlanets(scenario);
+  } catch (err) {
+    if (request !== scenarioRequest) return;
+    finishScenarioError(err);
+  }
+}
+
+function finishScenarioError(err) {
+  scenariosLoading = false;
+  console.error('Scenario loading failed:', err);
+  setScenarioStatus(`Could not load scenario: ${err.message}. Use Refresh scenarios after publishing or fixing the data.`, true);
+  scenarioSelect.disabled = !scenarios.length;
+  if (activeScenario) scenarioSelect.value = activeScenario.id;
+  else {
+    const option = document.getElementById('colour-mode').querySelector('option[value="planets"]');
+    option.textContent = 'Planets (unavailable)';
+    if (!scenarios.length) scenarioSelect.options[0].textContent = 'Scenarios unavailable';
+  }
+  if (selected >= 0) updatePlanetRow(selected);
+  if (systemIndex >= 0 && activeScenario) showSystem(systemIndex);
+}
+
+async function loadPlanets(scenario) {
+  const request = ++scenarioRequest;
+  scenariosLoading = true;
+  systemRequest++;
+  scenarioSelect.disabled = false;
+  setScenarioStatus(`Loading ${scenario.name}...`);
+  if (selected >= 0) updatePlanetRow(selected);
+  if (systemIndex >= 0) {
+    document.getElementById('s-planets').replaceChildren();
+    document.getElementById('s-diagram').replaceChildren();
+    document.getElementById('s-badge').replaceChildren();
+    for (const id of ['s-star', 's-hz', 's-notes']) document.getElementById(id).textContent = '';
+    document.getElementById('s-star').textContent = `Loading ${scenario.name}...`;
+  }
   const option = document.getElementById('colour-mode').querySelector('option[value="planets"]');
   try {
-    const res = await fetch('/api/systems-summary');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const summary = await res.json();
-    if (summary.planets.length !== firstSpecial) throw new Error('summary does not match the star catalogue');
+    const summary = await scenarioJson(scenarioUrl('/api/systems-summary', scenario));
+    if (request !== scenarioRequest) return;
+    if (summary.scenario_id !== scenario.id || summary.revision !== scenario.revision
+      || summary.catalogue_fingerprint !== scenarioCatalogue.catalogue_fingerprint
+      || summary.names_crc !== scenarioCatalogue.names_crc
+      || summary.planets.length !== firstSpecial || summary.flags.length !== firstSpecial) {
+      throw new Error('Scenario summary does not match the requested revision and star catalogue');
+    }
+    if (!summary.planets.every((n) => Number.isInteger(n) && n >= 0 && n <= 65535)
+      || !summary.flags.every((f) => Number.isInteger(f) && f >= 0 && f <= 255)) {
+      throw new Error('Scenario summary has invalid counts or flags');
+    }
     planetCount = new Uint16Array(N);
     planetFlags = new Uint8Array(N);
     planetCat = new Int8Array(N).fill(-1);
@@ -1484,11 +1603,16 @@ async function loadPlanets() {
     }
     option.textContent = 'Planets';
     option.disabled = false;
+    activeScenario = { ...scenario };
+    scenariosLoading = false;
+    scenarioSelect.value = scenario.id;
+    setScenarioStatus(`${scenario.name} · ${scenario.revision.slice(0, 8)}`);
     renderPlanetLegend();
+    applyColourState();
     if (selected >= 0) updatePlanetRow(selected);
+    if (systemIndex >= 0) showSystem(systemIndex);
   } catch (err) {
-    console.warn(`Planetary systems unavailable (${err.message})`);
-    option.textContent = 'Planets (unavailable)';
+    if (request === scenarioRequest) finishScenarioError(err);
   }
 }
 
@@ -1532,14 +1656,14 @@ function updatePlanetRow(i) {
   }
   const text = document.getElementById('d-planets');
   const button = document.getElementById('view-system');
-  if (!planetCount) {
-    text.textContent = 'loading…';
+  if (scenariosLoading || !planetCount) {
+    text.textContent = scenariosLoading ? 'loading scenario...' : 'scenario unavailable';
     button.disabled = true;
     return;
   }
   button.disabled = false;
   const n = planetCount[i], f = planetFlags[i];
-  const parts = [n === 0 ? 'none' : `${n} ${f & PF_CONFIRMED ? 'confirmed' : 'simulated'}`];
+  const parts = [n === 0 ? 'none' : `${n} ${f & PF_MANUAL ? 'scenario' : f & PF_CONFIRMED ? 'confirmed' : 'simulated'} planet${n === 1 ? '' : 's'}`];
   if (f & PF_HABITABLE) parts.push('potentially habitable');
   else if (f & PF_HAB_MOON) parts.push('habitable moon');
   else if (f & PF_HZ) parts.push('in habitable zone');
@@ -1609,6 +1733,7 @@ const svgEl = (tag, attrs) => {
 };
 
 async function showSystem(i) {
+  if (scenariosLoading || !activeScenario) return;
   systemIndex = i;
   const request = ++systemRequest;
   const panel = document.getElementById('system-panel');
@@ -1619,9 +1744,10 @@ async function showSystem(i) {
   document.getElementById('s-star').textContent = 'Loading…';
   panel.classList.remove('hidden');
   try {
-    const res = await fetch(`/api/system/${encodeURIComponent(records[i].name)}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const system = await res.json();
+    const system = await scenarioJson(scenarioUrl(`/api/system/${encodeURIComponent(records[i].name)}`, activeScenario));
+    if (system.scenario_id !== activeScenario.id || system.revision !== activeScenario.revision) {
+      throw new Error('System does not match the selected scenario revision');
+    }
     if (request === systemRequest) renderSystem(system);
   } catch (err) {
     if (request === systemRequest) document.getElementById('s-star').textContent = `Could not load system: ${err.message}`;
@@ -1629,11 +1755,15 @@ async function showSystem(i) {
 }
 
 function renderSystem(sys) {
+  document.getElementById('s-title').textContent = `${sys.name} system`;
   const st = sys.star, hz = sys.habitable_zone;
   const badge = document.getElementById('s-badge');
-  const badges = [sys.confirmed
+  const badges = [sys.flags & PF_MANUAL
+    ? ['simulated', 'Manually edited scenario']
+    : sys.confirmed
     ? ['confirmed', sys.name === 'Sol' ? 'Real Solar System' : 'Confirmed planets · NASA Exoplanet Archive']
     : ['simulated', `Simulated system (seed ${sys.seed})`]];
+  badges.push(['scenario', activeScenario.name]);
   if (sys.flags & (PF_HABITABLE | PF_HAB_MOON)) badges.push(['habitable', 'Potentially habitable']);
   badge.replaceChildren(...badges.map(([cls, text]) => {
     const b = document.createElement('span');
@@ -1661,7 +1791,8 @@ function renderSystem(sys) {
   if (sys.planets.some((p) => p.mass_kind === 'Msini')) notes.push('≥ : minimum mass (radial velocity, M sin i).');
   if (sys.planets.some((p) => p.mass_estimated || p.radius_estimated)) notes.push('~ : estimated from the mass–radius relation (Chen & Kipping 2017).');
   if (sys.confirmed && sys.planets.some((p) => p.moons_simulated)) notes.push('Exomoons are simulated (none confirmed yet).');
-  if (!sys.confirmed) notes.push('Planets and moons are a statistically plausible draw from measured occurrence rates, not observations.');
+  if (sys.flags & PF_MANUAL) notes.push('This scenario includes manual changes; these are not confirmed observations.');
+  else if (!sys.confirmed) notes.push('Planets and moons are a statistically plausible draw from measured occurrence rates, not observations.');
   document.getElementById('s-notes').textContent = notes.join(' ');
 }
 
@@ -1739,6 +1870,7 @@ function renderPlanetTable(sys) {
   };
   sys.planets.forEach((p, k) => {
     const tr = document.createElement('tr');
+    tr.title = `Provenance: ${p.provenance ?? p.source}`;
     tr.className = `planet${p.habitable ? ' habitable' : p.hz ? ' hz' : ''}`;
     tr.dataset.planet = k;
     const hzCell = cell(p.hz ? (p.hz === 'conservative' ? 'C' : 'O') : '—',
@@ -1759,10 +1891,12 @@ function renderPlanetTable(sys) {
     detail.dataset.parent = k;
     detail.hidden = true;
     const info = [p.description, `insolation ${sig(p.insolation)} S⊕`];
+    if (p.notes) info.push(p.notes);
     if (p.tidally_locked) info.push('likely tidally locked');
     if (p.habitable) info.push('potentially habitable');
     if (p.source === 'confirmed' && p.discovery) info.push(`discovered ${p.year ?? ''} by ${p.discovery.toLowerCase()}`);
     else if (p.source === 'simulated') info.push('simulated');
+    if (p.provenance === 'manual') info.push('manually authored');
     const td = document.createElement('td');
     td.colSpan = 10;
     td.textContent = info.join(' · ');
@@ -1771,6 +1905,7 @@ function renderPlanetTable(sys) {
 
     for (const m of p.moons) {
       const mr = document.createElement('tr');
+      mr.title = `Provenance: ${m.provenance ?? 'unspecified'}${m.notes ? ` · ${m.notes}` : ''}`;
       mr.className = `moon${m.habitable ? ' habitable' : ''}`;
       mr.dataset.parent = k;
       mr.hidden = true;

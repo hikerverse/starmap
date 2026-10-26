@@ -42,13 +42,20 @@
           <option value="planets" disabled>Planets (loading&hellip;)</option>
         </select>
       </label>
+      <label class="frame-row" title="Switch between published planetary scenarios without reloading the star map">
+        Scenario <select id="scenario-select" disabled>
+          <option>Loading scenarios&hellip;</option>
+        </select>
+      </label>
+      <div id="scenario-status" role="status" aria-live="polite"></div>
+      <button id="reload-scenarios" title="Refresh published scenario revisions">Refresh scenarios</button>
       <div id="sovereignty-legend" hidden>
         <label title="Hide stars that do not belong to any sovereignty"><input type="checkbox" id="toggle-unclaimed" checked> Unclaimed stars</label>
         <ul id="sovereignty-list"></ul>
       </div>
       <div id="planet-legend" hidden>
         <ul id="planet-list"></ul>
-        <label title="Only show stars with confirmed planets (NASA Exoplanet Archive) and the Solar System"><input type="checkbox" id="toggle-confirmed"> Confirmed planets only</label>
+        <label title="Only show systems containing observed planets in this scenario; manually authored planets are not observations"><input type="checkbox" id="toggle-confirmed"> Confirmed planets only</label>
       </div>
       <label><input type="checkbox" id="toggle-grid" checked> Grid &amp; drop lines</label>
       <label><input type="checkbox" id="toggle-labels" checked> Labels</label>

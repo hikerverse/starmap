@@ -1,0 +1,5 @@
+# Generated planetary snapshot and scenario databases (back up separately).
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm

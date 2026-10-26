@@ -48,14 +48,15 @@ html, body {
 #star-list li.blackhole .name { color: #ffc27a; }
 #star-list li.centre .name::after { content: " \2316"; opacity: 0.8; }
 
-.toolbar { display: flex; flex-direction: column; gap: 6px; }
+.toolbar { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow-y: auto; }
 .toolbar .buttons { display: flex; gap: 6px; }
 .toolbar .buttons button { flex: 1; }
 .distance-row, .frame-row { display: flex; align-items: center; gap: 6px; }
-#frame-select, #colour-mode {
+#frame-select, #colour-mode, #scenario-select {
   flex: 1; background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px;
   padding: 3px 6px; font: inherit;
 }
+#scenario-select { min-width: 0; }
 #sovereignty-legend { display: flex; flex-direction: column; gap: 4px; padding-left: 4px; }
 #sovereignty-legend[hidden] { display: none; }
 #sovereignty-list { list-style: none; margin: 0; padding: 0; max-height: 160px; overflow-y: auto; }
@@ -72,6 +73,9 @@ html, body {
   padding: 3px 6px; font: inherit;
 }
 #distance-status { font-size: 11px; opacity: 0.6; }
+#scenario-status { font-size: 11px; overflow-wrap: anywhere; }
+#scenario-status.error { color: #ffb3b3; }
+#reload-scenarios { margin-bottom: 4px; font-size: 11px; }
 #class-filter, #nebula-filter { display: flex; flex-wrap: wrap; gap: 3px; padding-left: 20px; }
 .class-chip {
   padding: 1px 6px; min-width: 22px; font-size: 11px; border-radius: 10px;

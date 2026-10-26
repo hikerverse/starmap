@@ -4,12 +4,14 @@ import gzip
 import json
 import os
 import re
+import sqlite3
 import threading
+from functools import lru_cache
 from pathlib import Path
 
 from flask import Flask, Response, abort, render_template, request
 
-import systems
+import scenarios
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -164,7 +166,13 @@ def json_file_response(path: Path, loader=load_stars) -> Response:
 
 @app.route("/api/stars")
 def api_stars():
-    return json_file_response(STARS_FILE)
+    return json_file_response(STARS_FILE, load_catalogue)
+
+
+def load_catalogue(path: Path) -> dict:
+    data = load_stars(path)
+    data["catalogue_fingerprint"] = scenarios.fingerprint(data["stars"])
+    return data
 
 
 @app.route("/api/neutron-stars")
@@ -200,22 +208,13 @@ _systems_state: dict = {}
 
 
 def systems_state() -> dict:
-    """Stars, confirmed systems and the per-star summary, rebuilt when any source file changes."""
-    def mtime(p: Path) -> int:
-        return p.stat().st_mtime_ns if p.exists() else 0
-
-    key = (mtime(STARS_FILE), mtime(KNOWN_PLANETS_FILE), mtime(SOLAR_SYSTEM_FILE))
+    """Cache only catalogue compatibility metadata; all runtime scenario databases are read-only."""
+    key = (str(DATA_DIR), STARS_FILE.stat().st_mtime_ns, STARS_FILE.stat().st_size)
     with _systems_lock:
         if _systems_state.get("key") != key:
             stars = load_stars(STARS_FILE)["stars"]
-            summary = systems.load_or_build_summary(DATA_DIR, stars)
-            raw = json.dumps(summary, separators=(",", ":")).encode("utf-8")
-            known, _ = systems.load_known_systems(DATA_DIR)
             _systems_state.clear()
-            _systems_state.update(
-                key=key, stars=stars, known=known, seed=summary["seed"],
-                index={s["name"]: i for i, s in enumerate(stars)},
-                raw=raw, gzip=gzip.compress(raw, compresslevel=6))
+            _systems_state.update(key=key, store=scenarios.Store(DATA_DIR, stars))
         return dict(_systems_state)
 
 
@@ -231,27 +230,49 @@ def gzip_response(raw: bytes, compressed: bytes) -> Response:
 
 @app.route("/api/systems-summary")
 def api_systems_summary():
-    """Planet count and flag bits per star, aligned with the order of /api/stars."""
-    try:
-        state = systems_state()
-    except (OSError, ValueError) as exc:
-        abort(500, description=str(exc))
-    return gzip_response(state["raw"], state["gzip"])
+    return scenario_response("summary")
 
 
 @app.route("/api/system/<path:name>")
 def api_system(name: str):
-    """Full planetary system (star, habitable zone, planets and moons) for one star."""
+    return scenario_response("system", name)
+
+
+@app.route("/api/scenarios")
+def api_scenarios():
+    return scenario_response("list")
+
+
+@lru_cache(maxsize=16)
+def scenario_summary_payload(data_dir: str, serialized_meta: str) -> tuple[bytes, bytes]:
+    meta = json.loads(serialized_meta)
+    raw = scenarios.dumps(scenarios.load_summary(Path(data_dir) / "scenarios", meta)).encode("utf-8")
+    return raw, gzip.compress(raw, compresslevel=6)
+
+
+def scenario_response(operation: str, name: str | None = None) -> Response:
     try:
-        state = systems_state()
-    except (OSError, ValueError) as exc:
-        abort(500, description=str(exc))
-    i = state["index"].get(name)
-    if i is None:
-        abort(404, description=f"No star named '{name}'")
-    system = systems.build_system(state["stars"][i], state["known"].get(name), state["seed"])
-    return Response(json.dumps(systems.round_floats(system), ensure_ascii=False),
-                    mimetype="application/json")
+        store = systems_state()["store"]
+        if operation == "list":
+            response = Response(scenarios.dumps(store.list()), mimetype="application/json")
+            response.headers["Cache-Control"] = "no-store"
+            return response
+        meta = store.resolve(request.args.get("scenario"), request.args.get("revision"))
+        if operation == "summary":
+            raw, compressed = scenario_summary_payload(str(DATA_DIR), scenarios.dumps(meta))
+            response = gzip_response(raw, compressed)
+        else:
+            response = Response(scenarios.dumps(store.system(meta, name)), mimetype="application/json")
+        response.headers["Cache-Control"] = "no-cache"
+        response.set_etag(f"{meta['scenario_id']}-{meta['revision']}-{operation}-{name or ''}".encode().hex())
+        return response.make_conditional(request)
+    except scenarios.ScenarioError as exc:
+        app.logger.warning("Scenario request rejected: %s", exc)
+        return Response(scenarios.dumps({"error": str(exc)}), status=exc.status, mimetype="application/json")
+    except (OSError, ValueError, KeyError, sqlite3.Error):
+        app.logger.exception("Could not read published scenario data")
+        return Response(scenarios.dumps({"error": "Published scenario data is unavailable or invalid. Check the server logs and publish a valid snapshot."}),
+                        status=503, mimetype="application/json")
 
 
 if __name__ == "__main__":

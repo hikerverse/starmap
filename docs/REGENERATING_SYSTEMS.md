@@ -7,15 +7,18 @@ simulated galaxy. For how the simulation works, see the
 
 ## What is stored and what is generated
 
-Only a small summary is stored. Full systems (planets, orbits, habitable zone, moons) are generated on
-demand from a seed, so the same star always gets the same system.
+The generator can produce full systems (planets, orbits, habitable zone, moons) deterministically from a
+seed. The live application now reads **frozen baseline snapshots and published scenarios**; it does not
+generate or write planetary data during requests. See [SCENARIOS.md](SCENARIOS.md) for the runtime workflow.
+
+The following files are generator inputs and the legacy statistics summary, not the live scenario store:
 
 | File | Role | How it is produced |
 | --- | --- | --- |
 | [data/stars.json](../data/stars.json) | The stars that get systems | `tools/import_hyg.py` |
 | [data/solar_system.json](../data/solar_system.json) | Sol's real planets and moons | Hand-maintained |
 | [data/known_planets.json](../data/known_planets.json) | Confirmed exoplanets matched to map stars | `tools/fetch_exoplanets.py` |
-| [data/systems_summary.json](../data/systems_summary.json) | Planet count and flag byte per star, plus the seed | `tools/generate_systems.py`, or automatically by the app |
+| [data/systems_summary.json](../data/systems_summary.json) | Legacy planet count and flag byte per star, plus the seed | `tools/generate_systems.py` |
 | [systems.py](../systems.py) | The generator (occurrence rates, habitable zone, moons) | Code |
 
 Each system is seeded from the string `"<seed>|<star name>"`. Python hashes string seeds with SHA-512, so
@@ -67,11 +70,9 @@ K dwarf                     3264    81.6%   13.2%   13.2%    9.3%  0.00%
 .\.venv\Scripts\python tools\generate_systems.py --seed 42
 ```
 
-The new seed is saved in `systems_summary.json`, and both the app and later runs without `--seed` keep using
-it. To go back to the original galaxy, run with `--seed 1` (the default).
-
-**Restart the app afterwards.** The running server caches the seed in memory and only reloads when
-`stars.json`, `known_planets.json` or `solar_system.json` change.
+The new seed is saved in `systems_summary.json`, and later legacy statistics runs without `--seed` keep
+using it. This does not alter published scenarios. To show a new population, create a new snapshot with
+the desired seed, then select its published scenario.
 
 ### 3. Refresh the confirmed exoplanets
 
@@ -91,8 +92,8 @@ it. To go back to the original galaxy, run with `--seed 1` (the default).
 It caches two downloads in `%TEMP%`: `nasa_pscomppars.csv` (the archive table) and `hygdata_v40.csv.gz`
 (the HYG catalogue). Add `--offline` to reuse the cached archive table without querying the archive again.
 
-The second command is optional: the app notices the changed file and rebuilds the summary on the next
-request. Running it yourself shows the updated statistics.
+The second command is optional and prints updated statistics. To use the refreshed observations in the
+map, create a new baseline snapshot. Existing snapshots keep their original observations.
 
 ### 4. After re-importing or editing the star catalogue
 
@@ -102,14 +103,15 @@ request. Running it yourself shows the updated statistics.
 .\.venv\Scripts\python tools\generate_systems.py
 ```
 
-The summary is stored in the same order as `stars.json`, so it must be rebuilt whenever the star list
-changes. Re-run `fetch_exoplanets.py` as well so confirmed planets attach to the right stars. Names may
-have changed, or new stars may be better matches.
+Summaries are stored in the same order as `stars.json`. Re-run `fetch_exoplanets.py` so confirmed planets
+attach to the right stars, then create a new baseline for the changed catalogue. Published scenarios
+check catalogue compatibility and reject mismatches instead of attaching planets to the wrong stars.
 
 ### 5. After editing Sol's data
 
-Edit `data/solar_system.json`, then either run `generate_systems.py` or simply reload the app. Sol is
-always a confirmed system, so the seed never changes its planets.
+Edit `data/solar_system.json`, then create a new baseline to capture the change. Alternatively export Sol
+into a scenario override, edit that JSON and publish the scenario. Mark fictional additions as manual;
+they are not confirmed observations. The seed does not change the original observed Solar System planets.
 
 ### 6. After changing the generator code
 
@@ -120,13 +122,13 @@ summary, increase `GENERATOR_VERSION` at the top of the file:
 GENERATOR_VERSION = 3
 ```
 
-Then run `generate_systems.py` and restart the app. Bumping the version makes any existing
-`systems_summary.json` stale, so the app rebuilds it on startup instead of serving numbers that no longer
-match the systems generated on demand.
+Then run `generate_systems.py` to inspect the new statistics and create a new baseline snapshot.
+Bumping the version makes the legacy `systems_summary.json` stale on its next tooling run, but cannot
+change a frozen published population.
 
-## Automatic rebuilds
+## Legacy summary rebuilds
 
-When the app serves `/api/systems-summary` or `/api/system/<name>`, it compares the stored summary with:
+When `tools/generate_systems.py` prepares its legacy summary, it records:
 
 | Key | Changes when |
 | --- | --- |
@@ -135,14 +137,15 @@ When the app serves `/api/systems-summary` or `/api/system/<name>`, it compares 
 | `star_count`, `names_crc` | Stars are added, removed, renamed or reordered |
 | `known_crc` | `known_planets.json` or `solar_system.json` changes |
 
-If any key differs, the app rebuilds the summary (about 4 s) and saves it. Deleting
-`systems_summary.json` also forces a rebuild with seed 1.
+These keys identify the legacy generator result. They do not trigger runtime rebuilding. Snapshot and
+scenario publication have their own revision and full-catalogue compatibility checks.
 
 ## Checking the result
 
 1. Run `generate_systems.py` and check the table. With seed 1, G dwarfs show about 76% with planets
    and 12% potentially habitable (optimistic).
-2. Start the app (`.\.venv\Scripts\python app.py`) and set **Colour by → Planets**. Grey, blue, amber and
+2. Create a snapshot as described in [SCENARIOS.md](SCENARIOS.md), start the app
+   (`.\.venv\Scripts\python app.py`) and set **Colour by → Planets**. Grey, blue, amber and
    green stars should appear, and the legend counts should be non-zero.
 3. Select a star with confirmed planets, for example "Tau Ceti", "Epsilon Eridani" or
    "Proxima Centauri", and click **View system**. The planets should be marked as confirmed.
@@ -153,7 +156,7 @@ If any key differs, the app rebuilds the summary (about 4 s) and saves it. Delet
 
 | Symptom | Cause and fix |
 | --- | --- |
-| The map still shows the old galaxy after `--seed` | The server cached the old seed. Restart the app. |
+| The map still shows the old galaxy after `--seed` | Published snapshots are immutable. Create a new baseline with that seed and select its scenario. |
 | `fetch_exoplanets.py` times out | The archive is slow or unreachable. Retry later, or use `--offline` if a cached table exists. |
 | A known exoplanet host has no planets | It may be too faint for HYG or have no spectral type (listed as unmatched in the fetch output). Or its planets were attached to a merged binary partner, e.g. GJ 667 C's planets appear on "Gl 667B". |
-| `/api/systems-summary` returns 500 | `stars.json` or one of the planet files is invalid JSON. The error message names the problem. |
+| Scenarios are unavailable | Create/publish a snapshot, check catalogue compatibility, and use **Refresh scenarios**. Check server logs for invalid data or missing files. |

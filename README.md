@@ -102,8 +102,9 @@ details panel shows a star's sovereignty in either colour mode.
 | Amber | A planet in the habitable zone (e.g. a gas giant or a mini-Neptune) |
 | Green | Potentially habitable: a rocky planet in the habitable zone of a suitable star |
 
-Each legend entry has a checkbox. **Confirmed planets only** restricts the map to stars with real
-exoplanets. The details panel summarises the system. **View system** opens a panel with stellar data,
+Each legend entry has a checkbox. **Confirmed planets only** restricts the map to systems marked as
+observed in the selected scenario. **Scenario** switches between published planetary populations without
+reloading the star field; **Refresh scenarios** picks up newly published revisions. The details panel summarises the system. **View system** opens a panel with stellar data,
 the habitable zone (conservative band in green, optimistic margins in amber), the snow line, a log-scale
 orbit diagram and a planet table. Click a planet row or dot to expand its description and moons. The
 Drag the panel's title to move it around the screen. The panel follows the selection, and Esc closes it.
@@ -290,8 +291,13 @@ when the page loads.
 
 ## Planetary systems
 
-Every star has a planetary system. Real data is used wherever it exists. All other systems are simulated
-from measured occurrence rates.
+Every star has a system record (possibly with no planets). Baseline snapshots use real data wherever it
+exists and simulate the other systems from measured occurrence rates. The application reads frozen,
+published snapshots rather than regenerating planets during requests. Named scenarios can replace
+individual systems with manually edited planets and moons.
+
+See [Scenarios and snapshots](docs/SCENARIOS.md) for snapshot creation, JSON editing, publication,
+backups and production deployment.
 
 **Real data**
 
@@ -352,14 +358,20 @@ See [docs/REGENERATING_SYSTEMS.md](docs/REGENERATING_SYSTEMS.md) for a step-by-s
 | 8 | Conservative HZ |
 | 16 | Habitable moon |
 | 32 | Confirmed planets |
+| 64 | Manually edited scenario system (published scenario summaries only) |
 
-The app rebuilds the summary automatically, in about 4 s, if the star list, the known planets or the
-generator version change.
+The legacy generator commands above are useful for simulation statistics and preparing input data.
+They do not change published scenarios. Create a new baseline snapshot to capture a different seed,
+updated observations or a changed generator. Existing baselines remain frozen.
 
 **Endpoints**
 
-- `/api/systems-summary`: the gzipped summary.
-- `/api/system/<star name>`: the full system with planets and moons, generated on demand.
+- `/api/scenarios`: published scenarios, revisions and catalogue metadata.
+- `/api/systems-summary?scenario=<id>&revision=<revision>`: the compact, gzipped scenario summary.
+- `/api/system/<star name>?scenario=<id>&revision=<revision>`: one frozen system with planets and moons.
+
+Omitting the query selects the configured default scenario. Browser requests always pin an explicit
+scenario and revision. Missing published data is an actionable error, not a request-time regeneration.
 
 **Limitations**
 
