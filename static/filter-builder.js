@@ -252,4 +252,11 @@ export function createFilterBuilder({ records, firstSpecial, solIndex, sovereign
     document.querySelector('#view-menu summary').focus();
   });
   document.getElementById('open-filters').disabled = false;
+  return {
+    // Rules applied outside the panel (e.g. restored settings); takes effect when the panel is next opened
+    setApplied(tree, galaxiesIncluded) {
+      applied = structuredClone(tree);
+      includeGalaxies = galaxiesIncluded;
+    },
+  };
 }

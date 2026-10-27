@@ -21,6 +21,7 @@ html, body {
   background: #0a1020; border: 1px solid #3b4f8f; border-radius: 4px;
 }
 .menu-commands button { text-align: left; }
+.menu-commands hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid #3b4f8f; }
 #advanced-filter-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }
 #filter-dialog {
   position: fixed; z-index: 11; box-sizing: border-box;

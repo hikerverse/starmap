@@ -38,6 +38,18 @@ centre; type in its search box to find stars by name. Click an entry to select i
 it. Drag the panel by its title; close it with **×**, the menu item again, or Escape (the first Escape
 clears a search). The list is only recomputed while the panel is open.
 
+### Saved settings
+
+StarExplorer remembers your session in this browser (`localStorage`, key `starexplorer:prefs:v1`):
+the applied advanced filter, frame, colour mode, scenario, sidebar toggles and class / type chips,
+sovereignty and planet legend toggles, the quick distance filter, the camera and rotation-centre star,
+and whether the star list is open and where. Changes are saved automatically (debounced) and restored
+on the next visit. Filters and the Planets colour mode wait for the scenario data before they are
+reapplied. Stars and sovereignties are stored by name, and anything invalid or no longer present is
+ignored rather than blocking start-up. **View → Clear saved data...** forgets everything and reloads
+with the defaults. Nothing is sent to the server, and if browser storage is disabled the app simply
+starts with defaults each time.
+
 ### Advanced filters
 
 Open **View → Filters...** in the top menu to build a set of conditions. The builder is hidden until

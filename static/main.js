@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { emptyFilter, evaluateFilter, countConditions } from './filters.js';
+import { emptyFilter, evaluateFilter, countConditions, parseFilter, serializeFilter } from './filters.js';
 import { createFilterBuilder } from './filter-builder.js';
+import { clearPrefs, loadPrefs, savePrefs, storageAvailable } from './prefs.js';
 
 // ---------- Tunables ----------
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
@@ -149,6 +150,8 @@ const kindVisible = [true, true, true, true, true];
 let specClass;             // Uint8Array(N): index into SPEC_CLASSES (stars) or NEB_TYPES (nebulae)
 const classVisible = SPEC_CLASSES.map(() => true);
 const nebTypeVisible = NEB_TYPES.map(() => true);
+let setClassVisibility = () => {};   // assigned once the chips are built
+let setNebTypeVisibility = () => {};
 let labelWidth;             // Float32Array(N), 0 = not measured yet
 let solIndex = -1;
 let allBounds = new THREE.Sphere();
@@ -189,6 +192,11 @@ let confirmedOnly = false;
 let advancedFilter = emptyFilter();
 let filterGalaxies = false;
 let advancedMask = null, advancedMaskAttr = null;
+let filterBuilder = null;
+// Saved settings that need planetary data wait here (and are kept in storage) until a scenario loads
+let pendingFilterText = null;
+let pendingColourMode = null;
+let pendingScenario = null;
 
 function filterData() {
   return { records, kind, specClass, sovOf, sovereignties, planetCat, planetFlags };
@@ -203,6 +211,7 @@ function applyAdvancedFilter(tree, includeGalaxies) {
   const mask = evaluateFilter(tree, filterData(), includeGalaxies);
   advancedFilter = structuredClone(tree);
   filterGalaxies = includeGalaxies;
+  pendingFilterText = null;
   advancedMask.set(mask);
   advancedMaskAttr.needsUpdate = true;
   visibilityChanged();
@@ -883,16 +892,17 @@ const starPanelTitle = document.getElementById('star-panel-title');
 const starListButton = document.getElementById('open-star-list');
 let starPanelDrag = null;
 
-function setStarPanelOpen(open) {
+function setStarPanelOpen(open, focus = true) {
   starPanel.classList.toggle('hidden', !open);
   starListButton.setAttribute('aria-pressed', String(open));
+  persist();
   if (!open) {
     stopStarPanelDrag();
     return;
   }
   keepStarPanelInView();
   renderList();
-  searchEl.focus();
+  if (focus) searchEl.focus();
 }
 function positionStarPanel(left, top) {
   const rect = starPanel.getBoundingClientRect();
@@ -910,6 +920,7 @@ function stopStarPanelDrag() {
   starPanelDrag = null;
   starPanelTitle.classList.remove('dragging');
   if (starPanelTitle.hasPointerCapture(pointerId)) starPanelTitle.releasePointerCapture(pointerId);
+  persist();
 }
 starListButton.addEventListener('click', () => {
   document.getElementById('view-menu').open = false;
@@ -1199,6 +1210,7 @@ function afterMove() {
   updateCentreInfo();
   updateCentreDistance();
   scheduleListRefresh();
+  persist();
 }
 
 function focusStar(i) {
@@ -1297,7 +1309,10 @@ controls.addEventListener('change', () => {
   }
   updateCentreDistance();
 });
-controls.addEventListener('end', scheduleListRefresh);
+controls.addEventListener('end', () => {
+  scheduleListRefresh();
+  persist(1000); // let damping settle before saving the camera
+});
 
 document.getElementById('reset-view').addEventListener('click', () => {
   document.getElementById('view-menu').open = false;
@@ -1312,10 +1327,11 @@ document.addEventListener('pointerdown', (event) => {
   if (!menu.contains(event.target)) menu.open = false;
 });
 document.getElementById('close-details').addEventListener('click', () => selectStar(-1));
-document.getElementById('toggle-grid').addEventListener('change', (e) => { helpers.visible = e.target.checked; });
+document.getElementById('toggle-grid').addEventListener('change', (e) => { helpers.visible = e.target.checked; persist(); });
 document.getElementById('toggle-labels').addEventListener('change', (e) => {
   labelLayer.hidden = !e.target.checked;
   labelsDirty = true;
+  persist();
 });
 function bindKindToggle(id, k, uniform) {
   document.getElementById(id).addEventListener('change', (e) => {
@@ -1353,14 +1369,14 @@ function buildClassFilter() {
   all.addEventListener('click', () => setClassVisibility(classVisible.map(() => true)));
   row.replaceChildren(...chips, all);
 
-  function setClassVisibility(vis) {
+  setClassVisibility = (vis) => {
     vis.forEach((v, k) => {
       classVisible[k] = v;
       starMaterial.uniforms.uClassVisible.value[k] = v ? 1.0 : 0.0;
       chips[k].classList.toggle('on', v);
     });
     visibilityChanged();
-  }
+  };
 }
 
 function buildNebulaFilter() {
@@ -1372,20 +1388,20 @@ function buildNebulaFilter() {
     b.textContent = t.label;
     b.style.setProperty('--chip', t.colour);
     b.title = `${t.title} (${counts[c]})\nClick to show/hide · double-click to show only this type`;
-    b.addEventListener('click', () => setTypeVisibility(nebTypeVisible.map((v, k) => (k === c ? !v : v))));
-    b.addEventListener('dblclick', () => setTypeVisibility(nebTypeVisible.map((_, k) => k === c)));
+    b.addEventListener('click', () => setNebTypeVisibility(nebTypeVisible.map((v, k) => (k === c ? !v : v))));
+    b.addEventListener('dblclick', () => setNebTypeVisibility(nebTypeVisible.map((_, k) => k === c)));
     return b;
   });
   document.getElementById('nebula-filter').replaceChildren(...chips);
 
-  function setTypeVisibility(vis) {
+  setNebTypeVisibility = (vis) => {
     vis.forEach((v, k) => {
       nebTypeVisible[k] = v;
       starMaterial.uniforms.uNebTypeVisible.value[k] = v ? 1.0 : 0.0;
       chips[k].classList.toggle('on', v);
     });
     visibilityChanged();
-  }
+  };
 }
 
 // Shared refresh after any show/hide filter changes
@@ -1394,9 +1410,11 @@ function visibilityChanged() {
   updateFilter(true);
   labelsDirty = true;
   renderList();
+  persist();
 }
 document.getElementById('colour-mode').addEventListener('change', (e) => {
   colourMode = e.target.value;
+  pendingColourMode = null;
   applyColourState();
 });
 document.getElementById('toggle-unclaimed').addEventListener('change', (e) => {
@@ -1435,6 +1453,7 @@ function applyColourState() {
   updateFilter(true);
   labelsDirty = true;
   renderList();
+  persist();
 }
 
 function renderSovereigntyLegend() {
@@ -1486,6 +1505,7 @@ document.getElementById('distance-filter').addEventListener('input', (e) => {
     const r = parseFloat(e.target.value);
     filterRadius = Number.isFinite(r) && r > 0 ? r : 0;
     updateFilter();
+    persist();
   }, 200);
 });
 let searchTimer = null;
@@ -1583,7 +1603,7 @@ async function init() {
   buildNebulaFilter();
   buildPoints();
   buildNebulae();
-  createFilterBuilder({
+  filterBuilder = createFilterBuilder({
     records, firstSpecial, solIndex, sovereignties, spectralClasses: SPEC_CLASSES,
     planetCategories: PLANET_CATS, onApply: applyAdvancedFilter,
   });
@@ -1593,9 +1613,144 @@ async function init() {
 
   resetView(true);
   stepAnimation(performance.now());
+  restorePrefs();
   renderList();
   loadScenarios();
 }
+
+// ---------- Saved settings (localStorage) ----------
+const SAVED_TOGGLES = ['toggle-grid', 'toggle-labels', 'toggle-stars', 'toggle-neutron', 'toggle-blackhole',
+  'toggle-nebula', 'toggle-galaxy', 'toggle-unclaimed', 'toggle-confirmed'];
+let restoring = false;
+
+function filterLookups() {
+  return { records, starCount: firstSpecial, sovereignties, spectralClasses: SPEC_CLASSES, planetCategories: PLANET_CATS };
+}
+
+function savedState() {
+  const panel = starPanel.style.left ? { left: parseFloat(starPanel.style.left), top: parseFloat(starPanel.style.top) } : null;
+  return {
+    frame,
+    colourMode: pendingColourMode ?? colourMode,
+    scenario: activeScenario?.id ?? pendingScenario,
+    toggles: Object.fromEntries(SAVED_TOGGLES.map((id) => [id, document.getElementById(id).checked])),
+    spectralClasses: [...classVisible],
+    nebulaTypes: [...nebTypeVisible],
+    planetCategories: [...planetVisible],
+    hiddenSovereignties: sovereignties.filter((_, k) => !sovVisible[k]).map((s) => s.name),
+    distance: document.getElementById('distance-filter').value,
+    filter: pendingFilterText ?? serializeFilter(advancedFilter, filterGalaxies, filterLookups()),
+    camera: {
+      target: controls.target.toArray(),
+      position: camera.position.toArray(),
+      centre: centre >= 0 ? records[centre].name : null,
+    },
+    starPanel: { open: !starPanel.classList.contains('hidden'), ...panel },
+  };
+}
+
+function persist(delay) {
+  if (restoring || !N) return;
+  savePrefs(savedState, delay);
+}
+
+const isBoolArray = (value, length) => Array.isArray(value) && value.length === length
+  && value.every((v) => typeof v === 'boolean');
+const isVector = (value) => Array.isArray(value) && value.length === 3 && value.every(Number.isFinite);
+
+function applyPendingFilter() {
+  if (!pendingFilterText) return;
+  try {
+    const { tree, includeGalaxies } = parseFilter(pendingFilterText, filterLookups());
+    applyAdvancedFilter(tree, includeGalaxies);
+    filterBuilder.setApplied(tree, includeGalaxies);
+  } catch (err) {
+    // Filters with planet conditions wait for scenario data; anything else is invalid and dropped
+    if (planetCat) {
+      console.warn('Saved filter could not be restored:', err.message);
+      pendingFilterText = null;
+      persist();
+    }
+  }
+}
+
+// Each part is validated separately so one stale or corrupt value can't block the rest
+function restorePrefs() {
+  const prefs = loadPrefs();
+  restoring = true;
+  try {
+    if (prefs.frame === 'equatorial') {
+      document.getElementById('frame-select').value = 'equatorial';
+      setFrame('equatorial');
+    }
+    for (const id of SAVED_TOGGLES) {
+      const value = prefs.toggles?.[id];
+      const box = document.getElementById(id);
+      if (typeof value === 'boolean' && box.checked !== value) {
+        box.checked = value;
+        box.dispatchEvent(new Event('change'));
+      }
+    }
+    if (isBoolArray(prefs.spectralClasses, classVisible.length)) setClassVisibility(prefs.spectralClasses);
+    if (isBoolArray(prefs.nebulaTypes, nebTypeVisible.length)) setNebTypeVisibility(prefs.nebulaTypes);
+    if (isBoolArray(prefs.planetCategories, planetVisible.length)) planetVisible.splice(0, Infinity, ...prefs.planetCategories);
+    if (Array.isArray(prefs.hiddenSovereignties)) {
+      const hidden = new Set(prefs.hiddenSovereignties);
+      sovereignties.forEach((s, k) => { sovVisible[k] = !hidden.has(s.name); });
+      renderSovereigntyLegend();
+    }
+    const modeOption = [...document.getElementById('colour-mode').options].find((o) => o.value === prefs.colourMode);
+    if (prefs.colourMode === 'planets') pendingColourMode = 'planets';
+    else if (modeOption && !modeOption.disabled) {
+      colourMode = prefs.colourMode;
+      document.getElementById('colour-mode').value = colourMode;
+    }
+    applyColourState();
+    if (typeof prefs.scenario === 'string') pendingScenario = prefs.scenario;
+    const radius = parseFloat(prefs.distance);
+    if (Number.isFinite(radius) && radius > 0) {
+      document.getElementById('distance-filter').value = String(radius);
+      filterRadius = radius;
+    }
+    if (typeof prefs.filter === 'string') {
+      pendingFilterText = prefs.filter;
+      applyPendingFilter();
+    }
+    const cam = prefs.camera;
+    if (isVector(cam?.target) && isVector(cam?.position)
+      && new THREE.Vector3(...cam.position).distanceTo(new THREE.Vector3(...cam.target)) > 1e-6) {
+      controls.target.fromArray(cam.target);
+      camera.position.fromArray(cam.position);
+      controls.update();
+      const index = typeof cam.centre === 'string' ? records.findIndex((r, i) => i < firstSpecial && r.name === cam.centre) : -1;
+      centre = index >= 0 && starPos(index).distanceTo(controls.target) < 1e-3 ? index : -1;
+      updateCentreInfo();
+    }
+    const panel = prefs.starPanel;
+    if (panel?.open === true) {
+      if (Number.isFinite(panel.left) && Number.isFinite(panel.top)) {
+        starPanel.style.left = `${panel.left}px`;
+        starPanel.style.top = `${panel.top}px`;
+      }
+      setStarPanelOpen(true, false);
+    }
+    updateFilter(true);
+  } catch (err) {
+    console.warn('Saved settings could not be fully restored:', err);
+  } finally {
+    restoring = false;
+  }
+}
+
+const clearButton = document.getElementById('clear-saved-data');
+clearButton.disabled = !storageAvailable;
+if (!storageAvailable) clearButton.title = 'Browser storage is unavailable, so settings are not being saved';
+clearButton.addEventListener('click', () => {
+  document.getElementById('view-menu').open = false;
+  if (!window.confirm('Clear all saved StarExplorer settings (filters, view, panels and toggles) and reload with defaults?')) return;
+  clearPrefs();
+  window.location.reload();
+});
 
 // Resolve sovereignty membership with a single pass over the catalogue (only member names are hashed)
 async function loadSovereignties(res) {
@@ -1707,7 +1862,9 @@ async function loadScenarios() {
       return option;
     }));
     const scenario = scenarios.find((s) => s.id === activeScenario?.id)
+      ?? scenarios.find((s) => s.id === pendingScenario)
       ?? scenarios.find((s) => s.id === catalogue.default_scenario);
+    pendingScenario = null;
     if (!scenario) throw new Error('Default scenario is not published.');
     scenarioSelect.value = scenario.id;
     await loadPlanets(scenario);
@@ -1781,7 +1938,13 @@ async function loadPlanets(scenario) {
     setScenarioStatus(`${scenario.name} · ${scenario.revision.slice(0, 8)}`);
     refreshAdvancedMask();
     renderPlanetLegend();
+    if (pendingColourMode === 'planets') {
+      colourMode = 'planets';
+      document.getElementById('colour-mode').value = 'planets';
+    }
+    pendingColourMode = null;
     applyColourState();
+    applyPendingFilter();
     if (selected >= 0) updatePlanetRow(selected);
     if (systemIndex >= 0) showSystem(systemIndex);
   } catch (err) {
@@ -2143,6 +2306,7 @@ function setFrame(newFrame) {
   if (selected >= 0) selectStar(selected);
   updateCentreInfo();
   labelsDirty = true;
+  persist();
 }
 
 // ---------- Camera readout ----------
