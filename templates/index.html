@@ -22,6 +22,7 @@
     <details id="view-menu">
       <summary>View</summary>
       <div class="menu-commands">
+        <button id="open-star-list" aria-pressed="false" aria-controls="star-panel" title="Show or hide the star search and list">Star list</button>
         <button id="open-filters" disabled>Filters...</button>
         <button id="reset-view" title="Centre on Sol">Reset view</button>
         <button id="show-all" title="Zoom out to fit every star">Show all</button>
@@ -65,9 +66,6 @@
   <div id="sidebar" class="panel">
     <h1>StarExplorer</h1>
     <div id="star-count"></div>
-    <input type="search" id="star-search" placeholder="Search stars&hellip;" autocomplete="off">
-    <div id="list-title"></div>
-    <ul id="star-list"></ul>
     <div class="toolbar">
       <label class="frame-row" title="Galactic: X towards the Galactic Centre, Y towards l = 90&deg;, Z towards the North Galactic Pole (right-handed). Equatorial: J2000, X towards RA 0h, Z towards the North Celestial Pole.">
         Frame <select id="frame-select">
@@ -112,6 +110,16 @@
       <div id="distance-status"></div>
     </div>
   </div>
+
+  <section id="star-panel" class="panel hidden" aria-labelledby="star-panel-title">
+    <div class="star-panel-heading">
+      <h2 id="star-panel-title" title="Drag to move this panel">Star list</h2>
+      <button type="button" id="close-star-panel" aria-label="Close star list">&times;</button>
+    </div>
+    <input type="search" id="star-search" placeholder="Search stars&hellip;" autocomplete="off" aria-label="Search stars">
+    <div id="list-title"></div>
+    <ul id="star-list"></ul>
+  </section>
 
   <section id="orientation-widget" class="panel" aria-labelledby="orientation-frame">
     <canvas id="orientation-canvas" width="104" height="104" role="img"></canvas>

@@ -33,7 +33,10 @@ neighbourhood around the camera looks right at any zoom level. Labels are declut
 the selected/centre star first, then stars near the rotation centre, then the brightest (named stars
 ahead of catalogue ids). Zoom in to reveal more. The grid rescales with zoom (spacing shown bottom-centre).
 
-The sidebar lists the 25 stars nearest the rotation centre; type in the search box to find stars by name.
+Open **View → Star list** to show a floating, draggable panel listing the 25 stars nearest the rotation
+centre; type in its search box to find stars by name. Click an entry to select it, double-click to fly to
+it. Drag the panel by its title; close it with **×**, the menu item again, or Escape (the first Escape
+clears a search). The list is only recomputed while the panel is open.
 
 ### Advanced filters
 

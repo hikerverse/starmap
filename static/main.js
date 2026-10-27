@@ -878,6 +878,60 @@ function updateLabels() {
 const listEl = document.getElementById('star-list');
 const listTitle = document.getElementById('list-title');
 const searchEl = document.getElementById('star-search');
+const starPanel = document.getElementById('star-panel');
+const starPanelTitle = document.getElementById('star-panel-title');
+const starListButton = document.getElementById('open-star-list');
+let starPanelDrag = null;
+
+function setStarPanelOpen(open) {
+  starPanel.classList.toggle('hidden', !open);
+  starListButton.setAttribute('aria-pressed', String(open));
+  if (!open) {
+    stopStarPanelDrag();
+    return;
+  }
+  keepStarPanelInView();
+  renderList();
+  searchEl.focus();
+}
+function positionStarPanel(left, top) {
+  const rect = starPanel.getBoundingClientRect();
+  starPanel.style.left = `${Math.max(0, Math.min(left, window.innerWidth - rect.width))}px`;
+  starPanel.style.top = `${Math.max(0, Math.min(top, window.innerHeight - rect.height))}px`;
+}
+function keepStarPanelInView() {
+  if (starPanel.classList.contains('hidden') || !starPanel.style.left) return;
+  const rect = starPanel.getBoundingClientRect();
+  positionStarPanel(rect.left, rect.top);
+}
+function stopStarPanelDrag() {
+  if (!starPanelDrag) return;
+  const { pointerId } = starPanelDrag;
+  starPanelDrag = null;
+  starPanelTitle.classList.remove('dragging');
+  if (starPanelTitle.hasPointerCapture(pointerId)) starPanelTitle.releasePointerCapture(pointerId);
+}
+starListButton.addEventListener('click', () => {
+  document.getElementById('view-menu').open = false;
+  setStarPanelOpen(starPanel.classList.contains('hidden'));
+});
+document.getElementById('close-star-panel').addEventListener('click', () => setStarPanelOpen(false));
+starPanelTitle.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !e.isPrimary || starPanelDrag) return;
+  const rect = starPanel.getBoundingClientRect();
+  starPanelDrag = { pointerId: e.pointerId, x: e.clientX - rect.left, y: e.clientY - rect.top };
+  starPanelTitle.setPointerCapture(e.pointerId);
+  starPanelTitle.classList.add('dragging');
+  e.preventDefault();
+});
+starPanelTitle.addEventListener('pointermove', (e) => {
+  if (!starPanelDrag || e.pointerId !== starPanelDrag.pointerId) return;
+  positionStarPanel(e.clientX - starPanelDrag.x, e.clientY - starPanelDrag.y);
+});
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  starPanelTitle.addEventListener(event, stopStarPanelDrag);
+}
+window.addEventListener('resize', keepStarPanelInView);
 
 function brightnessFromSol(i) {
   const d = Math.hypot(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]);
@@ -900,7 +954,7 @@ function nearestTo(p, count) {
 }
 
 function renderList() {
-  if (!N) return;
+  if (!N || starPanel.classList.contains('hidden')) return;
   const q = searchEl.value.trim().toLowerCase();
   let indices;
   if (!q) {
@@ -1445,6 +1499,17 @@ window.addEventListener('keydown', (e) => {
   if (filterDialog.open) { filterDialog.close(); return; }
   const menu = document.getElementById('view-menu');
   if (menu.open) { menu.open = false; return; }
+  if (!starPanel.classList.contains('hidden') && starPanel.contains(document.activeElement)) {
+    if (document.activeElement === searchEl && searchEl.value) { // first Escape clears the search
+      e.preventDefault();
+      searchEl.value = '';
+      renderList();
+      return;
+    }
+    setStarPanelOpen(false);
+    document.querySelector('#view-menu summary').focus();
+    return;
+  }
   selectStar(-1);
   hideSystem();
 });

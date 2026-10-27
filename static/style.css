@@ -90,6 +90,15 @@ button:disabled { opacity: 0.5; cursor: default; }
 #orientation-views { display: flex; gap: 4px; margin-top: 5px; pointer-events: auto; }
 #orientation-views button { padding: 2px 5px; font-size: 11px; }
 #star-count { opacity: 0.6; font-size: 12px; margin-bottom: 8px; }
+#star-panel {
+  top: 52px; left: 268px; width: 250px; height: min(520px, calc(100% - 200px)); min-height: 180px;
+  box-sizing: border-box; display: flex; flex-direction: column; z-index: 5;
+}
+#star-panel.hidden { display: none; }
+.star-panel-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+#star-panel-title { flex: 1; margin: 0; font-size: 15px; cursor: grab; touch-action: none; user-select: none; }
+#star-panel-title.dragging { cursor: grabbing; }
+#close-star-panel { padding: 0 6px; background: none; border: none; font-size: 18px; }
 #star-search {
   background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px;
   padding: 5px 8px; margin-bottom: 8px; font: inherit;
