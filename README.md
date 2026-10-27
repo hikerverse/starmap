@@ -27,6 +27,7 @@ The ~12 MB star file is served gzip-compressed (~2.8 MB) and cached in memory un
 | Reset view | Centre on Sol, 12 pc away |
 | Show all | Zoom out to fit every star |
 | Esc | Close details |
+| ? | Open the user guide (also **Help → User guide**); drag its header to move it, its corner to resize it |
 
 Star size and brightness follow each star's apparent magnitude as seen from the camera, so the
 neighbourhood around the camera looks right at any zoom level. Labels are decluttered automatically:

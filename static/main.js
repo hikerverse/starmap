@@ -1322,9 +1322,125 @@ document.getElementById('show-all').addEventListener('click', () => {
   document.getElementById('view-menu').open = false;
   showAll();
 });
+const topMenus = [...document.querySelectorAll('#top-menu details')];
 document.addEventListener('pointerdown', (event) => {
-  const menu = document.getElementById('view-menu');
-  if (!menu.contains(event.target)) menu.open = false;
+  for (const menu of topMenus) if (!menu.contains(event.target)) menu.open = false;
+});
+for (const menu of topMenus) {
+  menu.addEventListener('toggle', () => {
+    if (menu.open) for (const other of topMenus) if (other !== menu) other.open = false;
+  });
+}
+
+// ---------- User guide ----------
+const guideDialog = document.getElementById('guide-dialog');
+const guideContent = guideDialog.querySelector('.guide-content');
+const guideLinks = [...guideDialog.querySelectorAll('.guide-nav a')];
+const guideHero = guideDialog.querySelector('.guide-hero');
+let guideGeometry = null; // saved { left, top, width?, height? }, applied when the guide first opens
+let guideDrag = null;
+
+function positionGuide(left, top) {
+  const rect = guideDialog.getBoundingClientRect();
+  guideDialog.style.margin = '0';
+  guideDialog.style.right = guideDialog.style.bottom = 'auto';
+  guideDialog.style.left = `${Math.max(0, Math.min(left, window.innerWidth - rect.width))}px`;
+  guideDialog.style.top = `${Math.max(0, Math.min(top, window.innerHeight - rect.height))}px`;
+}
+function keepGuideInView() {
+  if (!guideDialog.open) return;
+  const rect = guideDialog.getBoundingClientRect();
+  positionGuide(rect.left, rect.top);
+}
+function guideState() {
+  const s = guideDialog.style;
+  if (!s.left) return guideGeometry;
+  const g = { left: parseFloat(s.left), top: parseFloat(s.top) };
+  if (s.width && s.height) Object.assign(g, { width: parseFloat(s.width), height: parseFloat(s.height) });
+  return g;
+}
+function openGuide() {
+  for (const menu of topMenus) menu.open = false;
+  if (!guideDialog.open) {
+    guideDialog.show();
+    if (guideGeometry && !guideDialog.style.left) {
+      const { left, top, width, height } = guideGeometry;
+      if (width && height) {
+        guideDialog.style.width = `${Math.min(width, window.innerWidth)}px`;
+        guideDialog.style.height = `${Math.min(height, window.innerHeight)}px`;
+      }
+      positionGuide(left, top);
+    } else {
+      keepGuideInView();
+    }
+  }
+  guideContent.focus({ preventScroll: true });
+}
+function stopGuideDrag() {
+  if (!guideDrag) return;
+  const { pointerId } = guideDrag;
+  guideDrag = null;
+  guideHero.classList.remove('dragging');
+  if (guideHero.hasPointerCapture(pointerId)) guideHero.releasePointerCapture(pointerId);
+  persist();
+}
+guideHero.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !e.isPrimary || guideDrag || e.target.closest('button')) return;
+  const rect = guideDialog.getBoundingClientRect();
+  guideDrag = { pointerId: e.pointerId, x: e.clientX - rect.left, y: e.clientY - rect.top };
+  guideHero.setPointerCapture(e.pointerId);
+  guideHero.classList.add('dragging');
+  e.preventDefault();
+});
+guideHero.addEventListener('pointermove', (e) => {
+  if (guideDrag && e.pointerId === guideDrag.pointerId) positionGuide(e.clientX - guideDrag.x, e.clientY - guideDrag.y);
+});
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) guideHero.addEventListener(event, stopGuideDrag);
+guideHero.addEventListener('dblclick', (e) => { // reset size and centre
+  if (e.target.closest('button')) return;
+  guideDialog.removeAttribute('style');
+  guideGeometry = null;
+  persist();
+});
+window.addEventListener('resize', keepGuideInView);
+new ResizeObserver(() => {
+  if (guideDialog.open && guideDialog.style.width) persist(); // user resized via the corner grip
+}).observe(guideDialog);
+function highlightGuideSection() {
+  const top = guideContent.getBoundingClientRect().top + 24;
+  let current = guideLinks[0];
+  for (const link of guideLinks) {
+    const section = guideDialog.querySelector(link.hash);
+    if (section.getBoundingClientRect().top <= top) current = link;
+  }
+  if (guideContent.scrollTop + guideContent.clientHeight >= guideContent.scrollHeight - 2) current = guideLinks.at(-1);
+  for (const link of guideLinks) link.classList.toggle('active', link === current);
+}
+document.getElementById('open-guide').addEventListener('click', openGuide);
+document.getElementById('guide-close').addEventListener('click', () => guideDialog.close());
+guideDialog.addEventListener('close', () => {
+  stopGuideDrag();
+  if (guideDialog.contains(document.activeElement) || document.activeElement === document.body) {
+    document.querySelector('#help-menu summary').focus();
+  }
+});
+for (const link of guideLinks) {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const section = guideDialog.querySelector(link.hash);
+    const top = section.getBoundingClientRect().top - guideContent.getBoundingClientRect().top + guideContent.scrollTop;
+    guideContent.scrollTo({ top: top - 8, behavior: 'smooth' }); // scrollIntoView would also scroll the panel itself
+  });
+}
+// overflow: hidden (needed for the resize grip) still allows programmatic scrolling; keep the panel pinned
+guideDialog.addEventListener('scroll', () => { guideDialog.scrollTop = 0; guideDialog.scrollLeft = 0; });
+guideContent.addEventListener('scroll', highlightGuideSection, { passive: true });
+guideDialog.addEventListener('toggle', highlightGuideSection);
+window.addEventListener('keydown', (e) => {
+  if (e.key !== '?' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+  e.preventDefault();
+  openGuide();
 });
 document.getElementById('close-details').addEventListener('click', () => selectStar(-1));
 document.getElementById('toggle-grid').addEventListener('change', (e) => { helpers.visible = e.target.checked; persist(); });
@@ -1515,10 +1631,11 @@ searchEl.addEventListener('input', () => {
 });
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (guideDialog.open && guideDialog.contains(document.activeElement)) { e.preventDefault(); guideDialog.close(); return; }
   const filterDialog = document.getElementById('filter-dialog');
   if (filterDialog.open) { filterDialog.close(); return; }
-  const menu = document.getElementById('view-menu');
-  if (menu.open) { menu.open = false; return; }
+  const openMenu = topMenus.find((menu) => menu.open);
+  if (openMenu) { openMenu.open = false; return; }
   if (!starPanel.classList.contains('hidden') && starPanel.contains(document.activeElement)) {
     if (document.activeElement === searchEl && searchEl.value) { // first Escape clears the search
       e.preventDefault();
@@ -1530,6 +1647,7 @@ window.addEventListener('keydown', (e) => {
     document.querySelector('#view-menu summary').focus();
     return;
   }
+  if (guideDialog.open) { guideDialog.close(); return; }
   selectStar(-1);
   hideSystem();
 });
@@ -1646,6 +1764,7 @@ function savedState() {
       centre: centre >= 0 ? records[centre].name : null,
     },
     starPanel: { open: !starPanel.classList.contains('hidden'), ...panel },
+    guide: guideState(),
   };
 }
 
@@ -1733,6 +1852,11 @@ function restorePrefs() {
         starPanel.style.top = `${panel.top}px`;
       }
       setStarPanelOpen(true, false);
+    }
+    const guide = prefs.guide;
+    if (guide && Number.isFinite(guide.left) && Number.isFinite(guide.top)) {
+      guideGeometry = { left: guide.left, top: guide.top };
+      if (guide.width >= 360 && guide.height >= 260) Object.assign(guideGeometry, { width: guide.width, height: guide.height });
     }
     updateFilter(true);
   } catch (err) {

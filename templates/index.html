@@ -30,6 +30,12 @@
         <button id="clear-saved-data" title="Forget saved filters, view, panels and toggles in this browser and reload with defaults">Clear saved data...</button>
       </div>
     </details>
+    <details id="help-menu">
+      <summary>Help</summary>
+      <div class="menu-commands">
+        <button id="open-guide" aria-controls="guide-dialog" title="How to use StarExplorer (shortcut: ?)">User guide <kbd>?</kbd></button>
+      </div>
+    </details>
     <span id="advanced-filter-status" role="status" aria-live="polite">Advanced filters off</span>
   </nav>
 
@@ -189,6 +195,135 @@
     <div id="scale-info"></div>
     <div id="camera-info" title="Camera position in galactic coordinates (Sol at the origin; X towards the Galactic Centre, Z towards the North Galactic Pole), and its distance from the selected object (or the rotation centre when nothing is selected)"></div>
   </div>
+
+  <dialog id="guide-dialog" aria-labelledby="guide-title">
+    <header class="guide-hero" title="Drag to move · double-click to reset size and position">
+      <div class="guide-hero-stars" aria-hidden="true"></div>
+      <div>
+        <p class="guide-kicker">User guide</p>
+        <h2 id="guide-title">Welcome to StarExplorer</h2>
+        <p>A 3D map of more than 100,000 real stars around the Sun, plus neutron stars, black holes, nebulae,
+          galaxies and planetary scenarios. Distances are in parsecs (1 pc &asymp; 3.26 light-years).</p>
+      </div>
+      <button type="button" id="guide-close" aria-label="Close user guide">&times;</button>
+    </header>
+    <div class="guide-body">
+      <nav class="guide-nav" aria-label="Guide sections">
+        <a href="#guide-start">&#10022; Getting started</a>
+        <a href="#guide-move">&#8635; Moving around</a>
+        <a href="#guide-select">&#9673; Selecting objects</a>
+        <a href="#guide-sidebar">&#9776; Display controls</a>
+        <a href="#guide-list">&#8981; Star list</a>
+        <a href="#guide-filters">&#9881; Advanced filters</a>
+        <a href="#guide-planets">&#9790; Planets &amp; scenarios</a>
+        <a href="#guide-axes">&#10133; Axes &amp; views</a>
+        <a href="#guide-saved">&#128190; Saved settings</a>
+        <a href="#guide-keys">&#9000; Shortcuts</a>
+      </nav>
+      <div class="guide-content" tabindex="0">
+        <section id="guide-start">
+          <h3><span class="guide-icon">&#10022;</span> Getting started</h3>
+          <p>The view opens centred on <b>Sol</b>. Every point is a real object placed at its measured distance.</p>
+          <div class="guide-cards">
+            <div class="guide-card"><b>1 &middot; Look around</b><span>Drag to rotate and scroll to zoom out until the local neighbourhood comes into view.</span></div>
+            <div class="guide-card"><b>2 &middot; Pick a star</b><span>Click any star to read its details; double-click to fly to it.</span></div>
+            <div class="guide-card"><b>3 &middot; Narrow it down</b><span>Use the sidebar toggles or <em>View &rarr; Filters&hellip;</em> to show only what matters.</span></div>
+          </div>
+          <p>Commands live in the <b>View</b> menu at the top: <em>Star list</em>, <em>Filters&hellip;</em>, <em>Reset view</em>,
+            <em>Show all</em> and <em>Clear saved data&hellip;</em> This guide is always under <b>Help</b>, or press <kbd>?</kbd>.</p>
+          <p class="guide-tip"><b>Tip:</b> this guide can stay open while you explore. Drag its header to move it, drag the bottom-right corner
+            to resize it, and double-click the header to put it back in the middle.</p>
+        </section>
+
+        <section id="guide-move">
+          <h3><span class="guide-icon">&#8635;</span> Moving around</h3>
+          <table class="guide-table">
+            <tr><td><span class="guide-mouse">Left-drag</span></td><td>Rotate around the current centre star</td></tr>
+            <tr><td><span class="guide-mouse">Right-drag</span>, <kbd>Shift</kbd> + drag or arrow keys</td><td>Pan the view</td></tr>
+            <tr><td><span class="guide-mouse">Scroll</span></td><td>Zoom in and out</td></tr>
+            <tr><td><span class="guide-mouse">Double-click</span> a star</td><td>Make it the centre of rotation and fly to about 3 pc from it</td></tr>
+          </table>
+          <p class="guide-tip"><b>Tip:</b> <em>View &rarr; Reset view</em> returns to Sol; <em>Show all</em> zooms out to fit every star.
+            The panel at the bottom right shows the current centre, scale and camera position.</p>
+        </section>
+
+        <section id="guide-select">
+          <h3><span class="guide-icon">&#9673;</span> Selecting objects</h3>
+          <p><b>Click</b> a star, nebula, compact object or galaxy to open its <b>details panel</b>: spectral class, colour,
+            magnitude, coordinates, sovereignty and distances from Sol and from the rotation centre.</p>
+          <p>While something is selected, the help panel at the bottom right shows its distance to the star you are rotating around,
+            which makes it easy to measure between two stars: double-click the first, then click the second.</p>
+          <p>Press <kbd>Esc</kbd> or the &times; button to clear the selection.</p>
+        </section>
+
+        <section id="guide-sidebar">
+          <h3><span class="guide-icon">&#9776;</span> Display controls</h3>
+          <dl class="guide-defs">
+            <dt>Frame</dt><dd><b>Galactic</b> (X towards the Galactic Centre, Z to the North Galactic Pole) or <b>Equatorial J2000</b>.</dd>
+            <dt>Colour by</dt><dd>True <b>star colour</b>, <b>sovereignty</b> (click a name in the legend to frame it; use its checkbox to hide it) or <b>planets</b>.</dd>
+            <dt>Object toggles</dt><dd>Show or hide stars <span class="star-key">&#9679;</span>, neutron stars <span class="neutron-key">&#10022;</span>,
+              black holes <span class="blackhole-key">&#9711;</span>, nebulae <span class="nebula-key">&#10059;</span> and galaxies <span class="galaxy-key">&#11053;</span>.
+              The chips below them filter by spectral class (O B A F G K M) and nebula type.</dd>
+            <dt>Grid &amp; labels</dt><dd>Toggle the reference grid with drop lines, and the name labels.</dd>
+            <dt>Show within</dt><dd>Quickly limit the map to objects within a number of parsecs of the selected star (or the centre when nothing is selected).</dd>
+          </dl>
+        </section>
+
+        <section id="guide-list">
+          <h3><span class="guide-icon">&#8981;</span> Star list</h3>
+          <p>Open <em>View &rarr; Star list</em> for a floating panel listing the stars nearest the centre. Type in the search box to
+            find a star by name; click a result to select it, double-click to fly to it.</p>
+          <p>Drag the panel by its title to move it. <kbd>Esc</kbd> clears the search first, then closes the panel.</p>
+        </section>
+
+        <section id="guide-filters">
+          <h3><span class="guide-icon">&#9881;</span> Advanced filters</h3>
+          <p><em>View &rarr; Filters&hellip;</em> opens a draggable panel that stays on screen while you work. Build rules, then press <b>Apply</b>.</p>
+          <ul class="guide-list">
+            <li><b>ALL</b> groups need every rule to match; <b>ANY</b> groups need at least one. Groups can be nested.</li>
+            <li><b>NOT</b> turns a rule or group into an exclusion.</li>
+            <li>Rules include distance from any chosen star, object kind, spectral class, sovereignty, planet category and confirmed planets.</li>
+          </ul>
+          <div class="guide-example">
+            <span class="guide-example-label">Example</span>
+            Two separate bubbles: <b>ANY</b> of
+            <code>within 10 pc of Sol</code> &middot; <code>within 10 pc of Deneb</code>
+          </div>
+          <p>Under <em>Save / load filter text</em>, <b>Copy filter text</b> gives you a short string you can keep and paste back later with
+            <b>Load &amp; apply</b>. The status at the top of the screen shows when advanced filters are active.</p>
+        </section>
+
+        <section id="guide-planets">
+          <h3><span class="guide-icon">&#9790;</span> Planets &amp; scenarios</h3>
+          <p>Choose a <b>Scenario</b> in the sidebar to load a published set of planetary systems; <em>Refresh scenarios</em> picks up new revisions.
+            With <em>Colour by &rarr; Planets</em>, stars are coloured by their planet category and <em>Confirmed planets only</em> hides invented systems.</p>
+          <p>Select a star with planets and press <b>View system</b> to see its orbits, habitable zone and planet table.</p>
+        </section>
+
+        <section id="guide-axes">
+          <h3><span class="guide-icon">&#10133;</span> Axes &amp; views</h3>
+          <p>The widget at the bottom left turns with the camera so you always know which way the Galactic Centre and the pole lie.
+            Its <kbd>XY</kbd> <kbd>XZ</kbd> <kbd>YZ</kbd> buttons snap the camera to look straight at that plane.</p>
+        </section>
+
+        <section id="guide-saved">
+          <h3><span class="guide-icon">&#128190;</span> Saved settings</h3>
+          <p>Your view, toggles, filters, scenario and open panels are saved automatically in this browser and restored next time.
+            Nothing is sent to the server. Use <em>View &rarr; Clear saved data&hellip;</em> to start again from the defaults.</p>
+        </section>
+
+        <section id="guide-keys">
+          <h3><span class="guide-icon">&#9000;</span> Keyboard shortcuts</h3>
+          <table class="guide-table">
+            <tr><td><kbd>?</kbd></td><td>Open this guide</td></tr>
+            <tr><td><kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&rarr;</kbd> <kbd>&darr;</kbd></td><td>Pan the view</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close the open menu, panel or dialog; otherwise clear the selection</td></tr>
+            <tr><td><kbd>Tab</kbd></td><td>Move between controls</td></tr>
+          </table>
+        </section>
+      </div>
+    </div>
+  </dialog>
 
   <script type="module" src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
