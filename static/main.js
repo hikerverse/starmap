@@ -40,6 +40,7 @@ const NEB_TYPES = [
 const NEB_PLANETARY = 2;
 const NEB_SNR = 3;
 const NEB_DARK = 4;
+const NEB_MORPHOLOGIES = { round: 0, elliptical: 1, bipolar: 2, irregular: 3, asymmetric: 3, 'quasi-stellar': 0 };
 // Label priority of nebulae, as an equivalent absolute magnitude (curated famous nebulae first)
 const NEB_LABEL_MAG = { curated: -7, 'Zucker+ 2020': -5 };
 const NEB_LABEL_MAG_DEFAULT = 1;
@@ -399,11 +400,13 @@ const NEBULA_VERTEX = /* glsl */`
   attribute vec3 iColor;
   attribute float iType;
   attribute float iSeed;
+  attribute float iMorphology;
   attribute float iVisible;
   varying vec2 vUv;
   varying vec3 vColor;
   varying float vType;
   varying float vSeed;
+  varying float vMorphology;
   varying float vFade;
   void main() {
     if (iVisible < 0.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
@@ -415,6 +418,7 @@ const NEBULA_VERTEX = /* glsl */`
     vColor = iColor;
     vType = iType;
     vSeed = iSeed;
+    vMorphology = iMorphology;
     gl_Position = projectionMatrix * mv;
   }`;
 const NEBULA_FRAGMENT = /* glsl */`
@@ -423,6 +427,7 @@ const NEBULA_FRAGMENT = /* glsl */`
   varying vec3 vColor;
   varying float vType;
   varying float vSeed;
+  varying float vMorphology;
   varying float vFade;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float noise(vec2 p) {
@@ -465,10 +470,36 @@ const NEBULA_FRAGMENT = /* glsl */`
       float wisp = vType > 3.0 ? 0.0 : 1.0;   // sub-puffs (3.3) carry only loose filaments, no shell
       a = (wisp * shell * (0.06 + 0.9 * fil) + (1.0 - wisp) * 0.35 * fil * smoothstep(0.45, 0.75, n) + haze) * edge * 0.9;
       col = mix(col, vec3(0.55, 0.75, 1.0), smoothstep(0.3, 0.8, f2) * 0.45);
-    } else if (vType > 1.5) {   // planetary nebula: bright shell, teal inside, red rim
-      float shell = smoothstep(0.32, 0.0, abs(r - 0.55));
-      a = (shell * 0.9 + 0.3 * (1.0 - r)) * (0.6 + 0.7 * n) * smoothstep(1.0, 0.85, r);
-      col = mix(col, vec3(1.0, 0.35, 0.45), smoothstep(0.5, 0.9, r));
+    } else if (vType > 1.5) {   // planetary nebula: nested ionised shells and bipolar lobes
+      float variation = hash(vec2(vSeed * 173.0, 8.3));
+      float morphology = vMorphology < 0.0 ? floor(variation * 4.0) : vMorphology;
+      float bipolar = 1.0 - step(0.5, abs(morphology - 2.0));
+      float irregular = step(2.5, morphology);
+      float angle = hash(vec2(vSeed * 97.0, 4.7)) * 6.2831853;
+      vec2 local = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * vUv;
+      float width = morphology < 0.5 ? 0.94 : mix(0.68 + 0.12 * variation, 0.64, bipolar);
+      vec2 w = vec2(local.x / width, local.y);
+      // Warp the outline, not just its brightness; irregular objects have stronger asymmetry.
+      w += (0.10 + 0.18 * irregular) * (vec2(fbm(q + 1.3), fbm(q + 9.2)) - 0.5);
+      float rw = length(w);
+      vec2 dir = w / max(rw, 1e-3);
+      float rimNoise = fbm(dir * 3.5 + vSeed * 31.0);
+      float rim = mix(0.57, 0.48, bipolar) * (1.0 + bipolar * 0.55 * (2.0 * dir.y * dir.y - 1.0));
+      rim *= 1.0 + (0.10 + 0.22 * irregular) * (rimNoise - 0.5);
+      float thickness = 0.045 + 0.045 * n;
+      float shell = exp(-pow((rw - rim) / thickness, 2.0));
+      float inner = exp(-pow((rw - rim * 0.72) / (thickness * 0.65), 2.0));
+      float halo = exp(-pow((rw - rim * 1.28) / 0.12, 2.0));
+      float filaments = pow(clamp(1.0 - abs(fbm(p * 3.1) - 0.5) * 2.0, 0.0, 1.0), 7.0);
+      float knots = smoothstep(0.48, 0.72, fbm(dir * 11.0 + vSeed * 47.0));
+      float coverage = mix(0.45, 1.0, smoothstep(0.25, 0.65, rimNoise));
+      float interior = 0.07 * (1.0 - smoothstep(rim * 0.4, rim, rw));
+      float edge = 1.0 - smoothstep(0.86, 1.0, r);
+      a = (shell * coverage * (0.28 + 0.65 * filaments + 0.5 * knots)
+        + 0.22 * inner * (0.4 + n) + 0.09 * halo * n + interior) * edge;
+      // O III-rich inner gas stays blue-green; the outer shell shifts towards H-alpha / N II.
+      float outer = smoothstep(rim * 0.78, rim * 1.12, rw);
+      col = mix(mix(col, vec3(0.35, 0.65, 1.0), 0.3), vec3(1.0, 0.28, 0.38), outer * 0.8);
     } else {                    // emission / reflection: billowy cloud
       a = pow(1.0 - r, 1.6) * (0.25 + 1.1 * n * n);
     }
@@ -482,6 +513,7 @@ function makeNebulaMesh(instances, dark) {
   geo.setIndex([0, 1, 2, 0, 2, 3]);
   const centre = new Float32Array(3 * n), radius = new Float32Array(n), colour = new Float32Array(3 * n);
   const type = new Float32Array(n), seed = new Float32Array(n), visible = new Float32Array(n).fill(1);
+  const morphology = new Float32Array(n);
   const owners = new Int32Array(n);
   instances.forEach((p, k) => {
     centre.set(p.c, 3 * k);
@@ -489,6 +521,14 @@ function makeNebulaMesh(instances, dark) {
     colour.set(hexToRgb(records[p.owner].colour), 3 * k);
     type[k] = p.type ?? specClass[p.owner];
     seed[k] = p.seed;
+    if (specClass[p.owner] === NEB_PLANETARY) {
+      // Stable per-object detail without changing the other nebulae's shared random sequence.
+      let hash = 2166136261;
+      for (const char of records[p.owner].name) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+      seed[k] = (hash >>> 0) / 4294967296;
+    }
+    const shape = records[p.owner].type?.match(/\(([^)]+)\)/)?.[1];
+    morphology[k] = NEB_MORPHOLOGIES[shape] ?? -1;
     owners[k] = p.owner;
   });
   geo.setAttribute('iCentre', new THREE.InstancedBufferAttribute(centre, 3));
@@ -496,6 +536,7 @@ function makeNebulaMesh(instances, dark) {
   geo.setAttribute('iColor', new THREE.InstancedBufferAttribute(colour, 3));
   geo.setAttribute('iType', new THREE.InstancedBufferAttribute(type, 1));
   geo.setAttribute('iSeed', new THREE.InstancedBufferAttribute(seed, 1));
+  geo.setAttribute('iMorphology', new THREE.InstancedBufferAttribute(morphology, 1));
   const visibleAttr = new THREE.InstancedBufferAttribute(visible, 1);
   geo.setAttribute('iVisible', visibleAttr);
   geo.instanceCount = n;
@@ -530,7 +571,7 @@ function buildNebulae() {
       continue;
     }
     out.push({ owner: i, c: [d.x, d.y, d.z], r: d.radius_pc, seed: rand() });
-    if (specClass[i] === NEB_PLANETARY) continue; // keep a single symmetric shell
+    if (specClass[i] === NEB_PLANETARY) continue; // shell and lobes share one billboard
     // Supernova remnants get extra loose filament wisps (type 3.3: no shell) scattered around the rim
     const snr = specClass[i] === NEB_SNR;
     if (snr) {

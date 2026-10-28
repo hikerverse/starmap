@@ -161,8 +161,10 @@ still fits the HYG stars only.
 
 Nebulae are drawn as soft, noise-textured glows sized to their physical radius, plus a dashed-ring marker
 (❋) for picking. Emission nebulae glow, supernova remnants are faint broken shells of thin wispy filaments,
-planetary nebulae show a shell with a red
-rim, and dark clouds dim the stars behind them. Use the **Nebulae** checkbox to hide or show them all. The
+planetary nebulae show uneven nested shells, filament detail and faint outer halos, with blue-green
+inner gas and reddish rims. Catalogue morphology selects round, elliptical, bipolar or irregular
+shapes; unclassified objects get a stable procedural mix. Dark clouds dim the stars behind them.
+Use the **Nebulae** checkbox to hide or show them all. The
 type chips (**Emission, Reflection, Planetary, SNR, Dark**) work like the spectral-class chips: click to
 toggle, double-click to show only that type. Nebulae are searchable, show up in the nearest list and respect
 the distance filter. The details panel shows catalogue IDs, size and the distance source.
@@ -312,7 +314,9 @@ Curated planetary nebulae take the Gaia distance when a catalogue match within 1
 Curated radii are `distance × tan(angular size / 2)`.
 
 Caveats: curated coordinates, distances and sizes are rounded literature values, good to roughly 5–20%.
-Nebulae are drawn as spheres, so filaments and bipolar shapes are only suggested. A molecular cloud's
+Nebulae use camera-facing procedural billboards, not reconstructed 3D gas volumes. Planetary shapes
+follow catalogue morphology where available, but their orientation and small-scale detail are
+illustrative, not measured images. A molecular cloud's
 size reflects the spread of its sightline distances, so large complexes (Cygnus X, Cepheus) can look
 elongated along the line of sight.
 
