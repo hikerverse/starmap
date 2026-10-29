@@ -75,6 +75,37 @@ The configuration covers `hikerverse.org`, not `www.hikerverse.org`.
 
 ## Controls
 
+### Subspace disturbance
+
+Open **View → Subspace disturbance...** for a separate, draggable settings window, then enable
+**Show subspace disturbance** for an illustrative, static volumetric field
+within 1,200 pc of Sol. Domain-warped filaments run through a weak background, with cores typically
+a few parsecs across. This is fictional spatial data, independent of the astronomical catalogue and
+planetary scenarios; it does not change object visibility, picking or filters.
+The window is non-blocking so you can navigate the map while adjusting it. **Close** or Escape
+closes the window without disabling the layer or discarding settings.
+
+**Glow** adjusts the presentation only. The **Seed** (an unsigned 32-bit integer) determines the field;
+**Regenerate** picks a new seed. The seed, generation version (currently 1), glow and visibility are
+saved with browser settings. Share the seed and generation version to reproduce the same field.
+Galactic/Equatorial frame changes preserve its alignment with the stars.
+
+The map displays accumulated disturbance along each line of sight, not a local percentage.
+Separate **Local disturbance** readings show the actual field strength at the camera and selected
+object, or indicate positions outside the mapped field. Glow does not affect these readings.
+
+The volume uses a cached, reduced-resolution ray-marched image (lower resolution on phones), with
+distance-filtered strands to limit aliasing. Fine strands blend together at survey-wide zoom levels;
+zoom in to inspect them. The layer does not render when disabled or when Glow is zero.
+
+Run the dependency-free field regression tests with Node.js 22+:
+
+```powershell
+node --experimental-default-type=module tests\test_subspace.mjs
+```
+
+### Navigation
+
 On tablets and phones (up to 1024 px wide), **Controls** opens a collapsible display-controls panel.
 Tap **Close** or the map to dismiss it. Object details, search, filters, planetary systems and the user
 guide fit the smaller viewport; long panels scroll, and planetary tables scroll horizontally.

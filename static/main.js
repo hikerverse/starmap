@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { emptyFilter, evaluateFilter, countConditions, parseFilter, serializeFilter } from './filters.js';
 import { createFilterBuilder } from './filter-builder.js';
 import { clearPrefs, loadPrefs, savePrefs, storageAvailable } from './prefs.js';
+import { createSubspace } from './subspace.js';
+import { disturbanceAt, SUBSPACE_RADIUS_PC } from './subspace-field.js';
 
 // ---------- Tunables ----------
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
@@ -122,6 +124,99 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+const subspace = createSubspace(renderer, scene);
+const displayToGalactic = new THREE.Matrix4();
+const equatorialToGalactic = new THREE.Matrix4().setFromMatrix3(EQ_TO_GAL);
+const subspaceToggle = document.getElementById('toggle-subspace');
+const subspaceSeed = document.getElementById('subspace-seed');
+const subspaceOpacity = document.getElementById('subspace-opacity');
+const subspaceError = document.getElementById('subspace-error');
+const subspaceDialog = document.getElementById('subspace-dialog');
+const subspaceTitle = document.getElementById('subspace-title');
+const openSubspace = document.getElementById('open-subspace');
+let subspaceDrag = null;
+
+function positionSubspace(left, top) {
+  const rect = subspaceDialog.getBoundingClientRect();
+  subspaceDialog.style.left = `${Math.max(0, Math.min(left, window.innerWidth - rect.width))}px`;
+  subspaceDialog.style.top = `${Math.max(0, Math.min(top, window.innerHeight - rect.height))}px`;
+}
+
+openSubspace.addEventListener('click', () => {
+  document.getElementById('view-menu').open = false;
+  if (!subspaceDialog.open) subspaceDialog.show();
+  openSubspace.setAttribute('aria-expanded', 'true');
+  const rect = subspaceDialog.getBoundingClientRect();
+  positionSubspace(rect.left, rect.top);
+  subspaceToggle.focus();
+});
+document.getElementById('close-subspace').addEventListener('click', () => subspaceDialog.close());
+subspaceDialog.addEventListener('close', () => {
+  openSubspace.setAttribute('aria-expanded', 'false');
+  document.querySelector('#view-menu summary').focus();
+});
+subspaceTitle.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
+  const rect = subspaceDialog.getBoundingClientRect();
+  subspaceDrag = { id: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
+  subspaceTitle.setPointerCapture(event.pointerId);
+  subspaceTitle.classList.add('dragging');
+  event.preventDefault();
+});
+subspaceTitle.addEventListener('pointermove', (event) => {
+  if (subspaceDrag?.id === event.pointerId) positionSubspace(event.clientX - subspaceDrag.x, event.clientY - subspaceDrag.y);
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  subspaceTitle.addEventListener(type, () => {
+    if (!subspaceDrag) return;
+    const { id } = subspaceDrag;
+    subspaceDrag = null;
+    subspaceTitle.classList.remove('dragging');
+    if (subspaceTitle.hasPointerCapture(id)) subspaceTitle.releasePointerCapture(id);
+  });
+}
+window.addEventListener('resize', () => {
+  if (!subspaceDialog.open) return;
+  const rect = subspaceDialog.getBoundingClientRect();
+  positionSubspace(rect.left, rect.top);
+});
+
+function syncSubspaceControls() {
+  const settings = subspace.settings;
+  subspaceToggle.checked = settings.enabled;
+  subspaceSeed.value = String(settings.seed);
+  subspaceOpacity.value = String(settings.opacity);
+  document.getElementById('subspace-opacity-value').value = `${Math.round(settings.opacity * 100)}%`;
+  document.getElementById('subspace-controls').hidden = !settings.enabled;
+  subspaceError.textContent = '';
+}
+
+function applySubspaceControls() {
+  if (!subspaceSeed.value || !subspaceSeed.checkValidity()) {
+    subspaceError.textContent = 'Enter a whole-number seed between 0 and 4294967295.';
+    subspaceSeed.reportValidity();
+    return;
+  }
+  subspace.configure({ ...subspace.settings, enabled: subspaceToggle.checked,
+    seed: Number(subspaceSeed.value), opacity: Number(subspaceOpacity.value) });
+  syncSubspaceControls();
+  persist();
+}
+
+subspaceToggle.addEventListener('change', () => {
+  subspace.configure({ ...subspace.settings, enabled: subspaceToggle.checked });
+  syncSubspaceControls();
+  persist();
+});
+subspaceSeed.addEventListener('change', applySubspaceControls);
+subspaceOpacity.addEventListener('input', applySubspaceControls);
+document.getElementById('regenerate-subspace').addEventListener('click', () => {
+  const random = new Uint32Array(1);
+  do { crypto.getRandomValues(random); } while (random[0] === subspace.settings.seed);
+  subspaceSeed.value = String(random[0]);
+  applySubspaceControls();
+});
+subspace.configure(subspace.settings);
 // Far plane covers the most distant extragalactic objects (hundreds of Mpc). Nothing is depth-tested
 // against anything that writes depth, so the huge far/near ratio costs nothing.
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.001, 1e10);
@@ -1705,6 +1800,7 @@ window.addEventListener('keydown', (e) => {
   if (guideDialog.open && guideDialog.contains(document.activeElement)) { e.preventDefault(); guideDialog.close(); return; }
   const filterDialog = document.getElementById('filter-dialog');
   if (filterDialog.open) { filterDialog.close(); return; }
+  if (subspaceDialog.open) { e.preventDefault(); subspaceDialog.close(); return; }
   const openMenu = topMenus.find((menu) => menu.open);
   if (openMenu) { openMenu.open = false; return; }
   if (compactLayout.matches && sidebar.classList.contains('controls-open')) {
@@ -1841,6 +1937,7 @@ function savedState() {
     },
     starPanel: { open: !starPanel.classList.contains('hidden'), ...panel },
     guide: guideState(),
+    subspace: subspace.settings,
   };
 }
 
@@ -1874,6 +1971,15 @@ function restorePrefs() {
   const prefs = loadPrefs();
   restoring = true;
   try {
+    if (prefs.subspace) {
+      try {
+        subspace.configure(prefs.subspace);
+        syncSubspaceControls();
+      } catch (err) {
+        console.warn('Saved subspace field could not be restored:', err.message);
+        subspaceError.textContent = err.message;
+      }
+    }
     if (prefs.frame === 'equatorial') {
       document.getElementById('frame-select').value = 'equatorial';
       setFrame('equatorial');
@@ -2531,6 +2637,20 @@ function updateCameraInfo() {
   if (!N) return;
   _camGal.copy(camera.position);
   if (frame !== 'galactic') _camGal.applyMatrix3(EQ_TO_GAL);
+  const fieldSettings = subspace.settings;
+  const cameraStrength = document.getElementById('subspace-camera');
+  const selectedStrength = document.getElementById('subspace-selected');
+  cameraStrength.hidden = !fieldSettings.enabled;
+  selectedStrength.hidden = !fieldSettings.enabled || selected < 0;
+  if (fieldSettings.enabled) {
+    const strengthText = (point) => point.length() >= SUBSPACE_RADIUS_PC ? 'outside mapped field'
+      : `${(100 * disturbanceAt(point.toArray(), fieldSettings.seed)).toFixed(1)}%`;
+    cameraStrength.textContent = `Local disturbance: ${strengthText(_camGal)}`;
+    if (selected >= 0) {
+      _objPos.set(records[selected].x, records[selected].y, records[selected].z).applyMatrix3(EQ_TO_GAL);
+      selectedStrength.textContent = `Local disturbance: ${strengthText(_objPos)}`;
+    }
+  }
   const r = _camGal.length();
   const maxAbs = Math.max(Math.abs(_camGal.x), Math.abs(_camGal.y), Math.abs(_camGal.z));
   const digits = maxAbs < 10 ? 3 : maxAbs < 1000 ? 2 : 1;
@@ -2561,6 +2681,9 @@ function loop(now) {
   updateLabels();
   updateCameraInfo();
   updateOrientation();
+  if (frame === 'galactic') displayToGalactic.identity();
+  else displayToGalactic.copy(equatorialToGalactic);
+  subspace.update(camera, displayToGalactic);
   renderer.render(scene, camera);
 }
 

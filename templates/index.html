@@ -25,6 +25,7 @@
       <div class="menu-commands">
         <button id="open-star-list" aria-pressed="false" aria-controls="star-panel" title="Show or hide the star search and list">Star list</button>
         <button id="open-filters" disabled>Filters...</button>
+        <button id="open-subspace" type="button" aria-controls="subspace-dialog" aria-expanded="false">Subspace disturbance...</button>
         <button id="reset-view" title="Centre on Sol">Reset view</button>
         <button id="show-all" title="Zoom out to fit every star">Show all</button>
         <hr>
@@ -70,6 +71,24 @@
         <p id="filter-text-status" role="status" aria-live="polite"></p>
       </details>
     </form>
+  </dialog>
+
+  <dialog id="subspace-dialog" aria-labelledby="subspace-title">
+    <div class="filter-heading">
+      <h2 id="subspace-title" title="Drag to move this panel">Subspace disturbance</h2>
+      <button id="close-subspace" type="button" aria-label="Close subspace settings">Close</button>
+    </div>
+    <label><input type="checkbox" id="toggle-subspace"> Show subspace disturbance</label>
+    <fieldset id="subspace-controls" hidden>
+      <legend>Subspace field v1</legend>
+      <label for="subspace-opacity">Glow <output id="subspace-opacity-value">60%</output></label>
+      <input id="subspace-opacity" type="range" min="0" max="1" step="0.05" value="0.6">
+      <label for="subspace-seed">Seed</label>
+      <input id="subspace-seed" type="number" min="0" max="4294967295" step="1" value="12345">
+      <button id="regenerate-subspace" type="button">Regenerate</button>
+      <p>Illustrative field within 1,200 pc of Sol. Glow shows accumulated disturbance, not local strength.</p>
+    </fieldset>
+    <p id="subspace-error" role="alert"></p>
   </dialog>
 
   <div id="sidebar" class="panel">
@@ -150,6 +169,7 @@
     <button id="close-details" title="Close">&times;</button>
     <h2 id="d-name"></h2>
     <button id="focus-selected" type="button">Centre on object</button>
+    <p id="subspace-selected" hidden></p>
     <table>
       <tr><th id="h-class">Spectral class</th><td id="d-class"></td></tr>
       <tr id="row-type" hidden><th>Type</th><td id="d-type"></td></tr>
@@ -199,6 +219,7 @@
     </div>
     <div class="touch-hints">Drag to rotate &middot; Pinch to zoom &middot; Two fingers to pan<br>Tap an object for details, then Centre on object</div>
     <div id="centre-info"></div>
+    <div id="subspace-camera" hidden></div>
     <div id="selection-distance" role="status" aria-live="polite"></div>
     <div id="scale-info"></div>
     <div id="camera-info" title="Camera position in galactic coordinates (Sol at the origin; X towards the Galactic Centre, Z towards the North Galactic Pole), and its distance from the selected object (or the rotation centre when nothing is selected)"></div>
@@ -274,6 +295,11 @@
               The chips below them filter by spectral class (O B A F G K M) and nebula type.</dd>
             <dt>Grid &amp; labels</dt><dd>Toggle the reference grid with drop lines, and the name labels.</dd>
             <dt>Show within</dt><dd>Quickly limit the map to objects within a number of parsecs of the selected star (or the centre when nothing is selected).</dd>
+            <dt>Subspace disturbance</dt><dd>Open <b>View &rarr; Subspace disturbance...</b> for an optional fictional volumetric field within 1,200 pc of Sol.
+              Change <b>Seed</b> or use <b>Regenerate</b> for a different field; the same seed and generation
+              version reproduce it. <b>Glow</b> changes appearance only. Cloud brightness accumulates along the
+              line of sight; <b>Local disturbance</b> gives strength at the camera or selected object.
+              Settings are saved in this browser.</dd>
           </dl>
         </section>
 
