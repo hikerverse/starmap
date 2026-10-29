@@ -1,0 +1,19 @@
+[Unit]
+Description=StarExplorer Gunicorn web server
+After=network.target
+
+[Service]
+Type=exec
+User=simon
+Group=simon
+WorkingDirectory=/home/simon/starmap
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/simon/starmap/.venv/bin/gunicorn --no-control-socket --bind 127.0.0.1:8000 --access-logfile - --error-logfile - app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

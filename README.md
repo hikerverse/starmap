@@ -15,6 +15,64 @@ $env:PORT=5057; .\.venv\Scripts\python app.py   # use another port if 5001 is bu
 
 The ~12 MB star file is served gzip-compressed (~2.8 MB) and cached in memory until the file changes.
 
+### Run with Gunicorn on Linux
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/gunicorn --no-control-socket --bind 127.0.0.1:8000 app:app
+```
+
+Run these commands from the project directory. Gunicorn serves the app at
+`http://127.0.0.1:8000` without Flask's development server. It stays in the foreground;
+use a service manager for automatic startup. Apache needs a reverse proxy configuration
+to serve this app through port 80. Gunicorn is not installed on Windows.
+The optional Gunicorn control socket is disabled to avoid runtime-directory
+permission errors.
+
+### Run Gunicorn as a systemd service
+
+`deploy/starmap.service` runs Gunicorn as `simon` from `/home/simon/starmap`, starts
+at boot, and restarts on failure. Update its user, group and paths if installing
+elsewhere. Stop any manually started Gunicorn instance first (Ctrl+C in its terminal)
+so port 8000 is free.
+
+Run these commands from the project directory in a regular terminal where `sudo`
+can prompt for your password:
+
+```bash
+sudo install -m 644 deploy/starmap.service /etc/systemd/system/starmap.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now starmap.service
+sudo systemctl status starmap.service --no-pager
+curl -I http://127.0.0.1:8000/
+```
+
+View logs with `sudo journalctl -u starmap.service -f`. After updating the app,
+run `sudo systemctl restart starmap.service`. Apache can continue proxying to
+`127.0.0.1:8000` without configuration changes.
+
+### Apache HTTPS reverse proxy
+
+`deploy/hikerverse.org.conf` serves `https://hikerverse.org` through Gunicorn at
+`127.0.0.1:8000` and redirects HTTP to HTTPS. It expects a valid certificate and key at
+`/etc/letsencrypt/live/hikerverse.org/fullchain.pem` and
+`/etc/letsencrypt/live/hikerverse.org/privkey.pem`. Obtain the certificate before
+enabling this site, or edit those paths to use your existing certificate.
+
+On Ubuntu, with Gunicorn running:
+
+```bash
+sudo a2enmod ssl proxy proxy_http headers
+sudo install -m 644 deploy/hikerverse.org.conf /etc/apache2/sites-available/hikerverse.org.conf
+sudo a2ensite hikerverse.org.conf
+sudo apache2ctl configtest && sudo systemctl reload apache2
+curl -I https://hikerverse.org/
+```
+
+Point the domain's DNS records at this server and allow inbound ports 80 and 443.
+The configuration covers `hikerverse.org`, not `www.hikerverse.org`.
+
 ## Controls
 
 | Action | Effect |
