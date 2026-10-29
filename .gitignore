@@ -3,3 +3,6 @@
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
+# python venv
+venv/
+.venv/
