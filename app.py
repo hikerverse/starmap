@@ -156,6 +156,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+
 def json_file_response(path: Path, loader=load_stars) -> Response:
     try:
         raw, compressed = stars_payload(path, loader)

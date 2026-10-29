@@ -1498,6 +1498,61 @@ for (const menu of topMenus) {
   });
 }
 
+// ---------- About ----------
+const aboutDialog = document.getElementById('about-dialog');
+const aboutTitle = document.getElementById('about-title');
+const aboutContent = aboutDialog.querySelector('.about-content');
+for (const link of aboutDialog.querySelectorAll('.about-nav a')) {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    const section = aboutDialog.querySelector(link.hash);
+    aboutContent.scrollTop += section.getBoundingClientRect().top - aboutContent.getBoundingClientRect().top - 16;
+  });
+}
+let aboutDrag = null;
+function positionAbout(left, top) {
+  const rect = aboutDialog.getBoundingClientRect();
+  aboutDialog.style.margin = '0';
+  aboutDialog.style.right = aboutDialog.style.bottom = 'auto';
+  aboutDialog.style.left = `${Math.max(0, Math.min(left, window.innerWidth - rect.width))}px`;
+  aboutDialog.style.top = `${Math.max(0, Math.min(top, window.innerHeight - rect.height))}px`;
+}
+document.getElementById('open-about').addEventListener('click', () => {
+  for (const menu of topMenus) menu.open = false;
+  if (!aboutDialog.open) aboutDialog.show();
+  const rect = aboutDialog.getBoundingClientRect();
+  positionAbout(rect.left, rect.top);
+  aboutContent.focus({ preventScroll: true });
+});
+document.getElementById('close-about').addEventListener('click', () => aboutDialog.close());
+aboutDialog.addEventListener('close', () => document.querySelector('#help-menu summary').focus());
+aboutTitle.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 || !event.isPrimary) return;
+  const rect = aboutDialog.getBoundingClientRect();
+  aboutDrag = { id: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
+  aboutTitle.setPointerCapture(event.pointerId);
+  aboutTitle.classList.add('dragging');
+  event.preventDefault();
+});
+aboutTitle.addEventListener('pointermove', (event) => {
+  if (aboutDrag?.id === event.pointerId) positionAbout(event.clientX - aboutDrag.x, event.clientY - aboutDrag.y);
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  aboutTitle.addEventListener(type, () => {
+    if (!aboutDrag) return;
+    const { id } = aboutDrag;
+    aboutDrag = null;
+    aboutTitle.classList.remove('dragging');
+    if (aboutTitle.hasPointerCapture(id)) aboutTitle.releasePointerCapture(id);
+  });
+}
+aboutTitle.addEventListener('dblclick', () => aboutDialog.removeAttribute('style'));
+window.addEventListener('resize', () => {
+  if (!aboutDialog.open) return;
+  const rect = aboutDialog.getBoundingClientRect();
+  positionAbout(rect.left, rect.top);
+});
+
 // ---------- User guide ----------
 const guideDialog = document.getElementById('guide-dialog');
 const guideContent = guideDialog.querySelector('.guide-content');
@@ -1797,6 +1852,7 @@ searchEl.addEventListener('input', () => {
 });
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (aboutDialog.open && aboutDialog.contains(document.activeElement)) { e.preventDefault(); aboutDialog.close(); return; }
   if (guideDialog.open && guideDialog.contains(document.activeElement)) { e.preventDefault(); guideDialog.close(); return; }
   const filterDialog = document.getElementById('filter-dialog');
   if (filterDialog.open) { filterDialog.close(); return; }
@@ -1820,6 +1876,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (guideDialog.open) { guideDialog.close(); return; }
+  if (aboutDialog.open) { e.preventDefault(); aboutDialog.close(); return; }
   selectStar(-1);
   hideSystem();
 });

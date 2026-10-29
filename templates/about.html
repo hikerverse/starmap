@@ -1,0 +1,202 @@
+{% if not about_embedded %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About StarExplorer &amp; methods</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="about-page">
+{% endif %}
+  <{{ 'div' if about_embedded else 'main' }} class="about-content" {% if about_embedded %}tabindex="0"{% endif %}>
+    <header>
+      {% if not about_embedded %}
+      <a href="{{ url_for('index') }}">Open the star map</a>
+      {% endif %}
+      <h1>About StarExplorer</h1>
+      <p class="about-intro">Explore the real stellar neighbourhood, investigate plausible planetary
+        populations, and build fictional worlds on an astronomical foundation.</p>
+    </header>
+    <nav class="about-nav" aria-label="About page sections">
+      <a href="#capabilities">What it can do</a>
+      <a href="#data">Astronomical databases</a>
+      <a href="#statistics">Statistical modelling</a>
+      <a href="#snapshots">Snapshots &amp; scenarios</a>
+      <a href="#limits">Limits &amp; interpretation</a>
+      <a href="#references">Sources &amp; references</a>
+    </nav>
+
+    <section id="capabilities">
+      <h2>What is this tool?</h2>
+      <p>StarExplorer is an interactive three-dimensional map built with a Python Flask server and
+        a three.js/WebGL browser renderer. It combines a catalogue of roughly 107,000 stars with
+        neutron stars, black holes, nebulae, and a distant backdrop of galaxies and galaxy clusters.
+        Positions are expressed in parsecs, with Sol at the origin; one parsec is about 3.26 light-years.</p>
+      <ul>
+        <li>Rotate, pan, zoom, search by name or catalogue ID, select objects, and centre the view on
+          stars or Galactic objects. Touch controls and responsive panels support phones and tablets.</li>
+        <li>Switch between Galactic and equatorial J2000 coordinates, use axis-aligned views, and
+          inspect distances, spectral classes, catalogue identifiers and source notes.</li>
+        <li>Filter by distance, object type, spectral class, sovereignty or planetary category.
+          Combine nested ALL, ANY and NOT rules and save or share filter text.</li>
+        <li>Inspect planetary systems, orbit diagrams, stellar properties, habitable zones, planet
+          descriptions and moons. Switch published scenarios to explore alternative populations.</li>
+        <li>Colour stars by their spectral colours, planetary categories or fictional sovereignties.
+          Add an optional seeded volumetric subspace-disturbance layer.</li>
+      </ul>
+      <p>The map is a spatial exploration and world-building tool, not a telescope image or a
+        precision astronomical measurement service. The separate <b>User guide</b> in Help explains
+        the controls step by step.</p>
+    </section>
+
+    <section id="data">
+      <h2>How astronomical databases were used</h2>
+      <p>The catalogue supplies the observational foundation. Import tools convert source records
+        into local JSON datasets, which the server validates and serves to the browser. The app
+        does not query an astronomical archive every time you move the camera.</p>
+      <dl>
+        <dt>Stars: HYG Database v4.0</dt>
+        <dd>Most stars come from David Nash's HYG compilation; the initial ten entries were entered
+          by hand. The import uses usable distances and spectral classes, preserves existing entries,
+          and suppresses close companions within 0.05 pc of an included star to avoid overlapping
+          map points. Colours are derived from B&minus;V colour indices. Names and catalogue
+          identifiers make the map searchable.</dd>
+        <dt>Confirmed planets: NASA Exoplanet Archive</dt>
+        <dd>The <code>pscomppars</code> table is downloaded and host stars are cross-matched to the
+          map using catalogue identifiers and, where needed, sky position and distance. Positional
+          matching allows a small angular separation and a distance tolerance; it is not just a
+          name lookup. Sol has a separate Solar System dataset. Available archive stellar parameters
+          take precedence over estimates derived from the map's spectral data.</dd>
+        <dt>Nebulae and molecular clouds</dt>
+        <dd>Curated literature entries are combined with planetary-nebula distances and morphology
+          from Gonz&aacute;lez-Santamar&iacute;a et al. (2021), using Gaia EDR3 parallaxes, and local
+          molecular-cloud sightlines from Zucker et al. (2020). Position, physical size and
+          morphology guide the rendering; the cloud textures themselves are procedural illustrations.</dd>
+        <dt>Compact objects and galaxies</dt>
+        <dd>Curated neutron-star, black-hole and extragalactic catalogues use published positions,
+          distances and other properties, with notes about individual objects. Neutron-star positions
+          use SIMBAD/ATNF information or coordinates encoded in J2000 object names. These lists
+          supplement the star catalogue; they are not complete surveys of every object.</dd>
+      </dl>
+    </section>
+
+    <section id="statistics">
+      <h2>How statistical techniques fill the gaps</h2>
+      <p>Most catalogue stars do not have a measured planetary system. Rather than treating every
+        unmeasured star as planet-free, the generator makes a <b>synthetic population</b> using
+        occurrence-rate models informed by exoplanet research. This is Monte Carlo sampling:
+        distributions describe a population, and seeded random draws produce one plausible
+        realisation. It is not a detection or a prediction of the actual planets around a particular star.</p>
+      <ol>
+        <li><b>Estimate stellar properties.</b> Spectral type, luminosity class and absolute magnitude
+          inform temperature, luminosity, mass and radius estimates, using a stellar sequence based
+          on Pecaut &amp; Mamajek. These estimates are inputs to the planet model, not new measurements.</li>
+        <li><b>Choose which populations occur.</b> Probabilistic host selection depends on stellar
+          group and evolutionary state; giant-planet occurrence also depends on stellar mass and
+          sampled metallicity. Metallicity is drawn from a Gaussian distribution when simulated,
+          rather than assumed to have been measured for each star.</li>
+        <li><b>Draw planet counts and properties.</b> Populations use host probabilities and
+          one-plus-Poisson multiplicities, not a fixed number of planets for every star.
+          Piecewise power-law distributions supply periods, sizes or masses. Log-normal scatter
+          gives related but non-identical planet sizes within a system and variation in
+          inferred masses. Empirical relations connect mass and radius.</li>
+        <li><b>Model eccentricities and reject implausible arrangements.</b> Rayleigh, Gaussian
+          and beta distributions are used for different planet populations. Very short-period
+          orbits are circularised in the model. Crossing or overly close orbits are removed using
+          a mutual-Hill-radius spacing rule. This is a plausibility screen, not a long-term
+          gravitational simulation or proof of stability.</li>
+        <li><b>Calculate derived properties.</b> Orbital periods, insolation, equilibrium temperatures,
+          habitable-zone membership and approximate tidal-locking behaviour follow physical
+          formulae and published prescriptions. Moon populations use host-mass and Hill-sphere
+          constraints plus statistical sampling; simulated exomoons are not observations.</li>
+      </ol>
+      <p>Small-planet occurrence draws on SAG13 and Dressing &amp; Charbonneau; giant planets on
+        Johnson, Fulton and Cumming; cold Neptunes on Suzuki. The radius valley and within-system
+        size similarity are inspired by Fulton and Weiss. Eccentricity and mass&ndash;radius models
+        draw on Kipping, Van Eylen, and Chen &amp; Kipping. These are simplified, research-informed
+        prescriptions, not full reproductions of every cited study or a fitted posterior for each star.</p>
+      <p>Randomness is <b>deterministic per seed and star name</b> for a fixed generator and input
+        version. Re-running that same setup recreates its generated population. Changing the seed
+        explores a different realisation; changing the input data or generator can also change the result.</p>
+    </section>
+
+    <section id="snapshots">
+      <h2>Why there are databases and published scenarios</h2>
+      <p>Generation happens offline. A baseline freezes the full planetary population, including
+        empty systems and moon lists, into an indexed SQLite database. Metadata records the seed,
+        generator version, source hashes and catalogue fingerprint. The web app reads these
+        published databases without regenerating planets during requests.</p>
+      <p>A named scenario pins a baseline and can replace selected systems with explicitly authored
+        planets and moons. Publishing validates replacements, recalculates derived properties and
+        creates an immutable revision. Unchanged systems inherit their baseline. Manually altered
+        physical properties and newly authored bodies carry manual provenance rather than
+        silently becoming confirmed observations.</p>
+      <p>The browser first receives compact planet counts and category flags in catalogue order,
+        then requests detailed systems as needed. This keeps the initial map smaller than sending
+        every planetary system and moon. Revision identifiers and catalogue fingerprints help
+        prevent mixing incompatible data. SQLite snapshots must be deployed and backed up
+        separately from the editable JSON; they are excluded from Git.</p>
+    </section>
+
+    <section id="limits">
+      <h2>Reading the map responsibly</h2>
+      <ul>
+        <li><b>Observed, simulated and manual are different.</b> A confirmed planet may still have
+          estimated parameters and simulated moons. A generated planet is a model outcome.
+          A manual scenario system is authored content. Check provenance and source notes.</li>
+        <li><b>Potentially habitable does not mean inhabited.</b> The flag uses simplified
+          size/mass, stellar and habitable-zone criteria. Equilibrium temperature is not surface
+          temperature; atmospheres, climate, water and biology are not established by this model.</li>
+        <li><b>The star sample is incomplete and biased.</b> HYG is magnitude-limited: distant
+          faint stars, especially red dwarfs, are missing. Parallax uncertainties increase with
+          distance. Counts and percentages on this map should not be read as unbiased Galactic
+          population estimates.</li>
+        <li><b>Rendering is illustrative.</b> Point sizes and compact-object glyphs aid visibility,
+          not physical scale. Nebula detail and orientation are not reconstructed images.
+          Distant galaxy positions and curated literature values have uncertainties.</li>
+        <li><b>Subspace disturbance and sovereignties are fictional.</b> The disturbance is a seeded
+          mathematical field, not measured interstellar gas or a discovered physical phenomenon.
+          Its glow accumulates along the line of sight; its local percentage is a dimensionless
+          model strength, not a calibrated scientific measurement.</li>
+      </ul>
+    </section>
+
+    <section id="references">
+      <h2>Sources, attribution and further reading</h2>
+      <ul>
+        <li><a href="https://github.com/astronexus/HYG-Database">HYG Database</a>, David Nash:
+          stellar catalogue, licensed under
+          <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
+          StarExplorer filters and transforms the catalogue for its map.</li>
+        <li><a href="https://exoplanetarchive.ipac.caltech.edu/">NASA Exoplanet Archive</a>:
+          confirmed-planet and host-star inputs.</li>
+        <li><a href="https://simbad.cds.unistra.fr/simbad/">SIMBAD</a> and
+          <a href="https://www.atnf.csiro.au/research/pulsar/psrcat/">ATNF Pulsar Catalogue</a>:
+          compact-object identification and positional references.</li>
+        <li><a href="https://doi.org/10.1051/0004-6361/202141916">Gonz&aacute;lez-Santamar&iacute;a
+          et al. (2021), A&amp;A 656, A51</a>: planetary nebulae.</li>
+        <li><a href="https://doi.org/10.1051/0004-6361/201936145">Zucker et al. (2020),
+          A&amp;A 633, A51</a>: molecular-cloud distances.</li>
+        <li>Pecaut &amp; Mamajek (2013; updated dwarf sequence): stellar properties.
+          Kopparapu et al. (2013, 2014): habitable-zone prescriptions.</li>
+        <li>Kopparapu et al. (2018, SAG13); Dressing &amp; Charbonneau (2015);
+          Johnson et al. (2010); Cumming et al. (2008); Fulton et al. (2017, 2021);
+          Suzuki et al. (2016); Weiss et al. (2018): planet-population prescriptions.</li>
+        <li>Kipping (2013); Van Eylen et al. (2019); Chen &amp; Kipping (2017):
+          eccentricity and mass&ndash;radius relations. Canup &amp; Ward (2006),
+          Domingos et al. (2006), and Barnes &amp; O'Brien (2002): moon-model constraints.</li>
+      </ul>
+      <p>Published research informs the implementation; inclusion here does not imply endorsement.
+        The installed datasets and published scenario revisions determine which observations and
+        generated worlds this instance serves.</p>
+    </section>
+    {% if not about_embedded %}
+    <footer><a href="{{ url_for('index') }}">Open StarExplorer</a> &middot;
+      If you opened this page from Help, close this tab to return to your existing map.</footer>
+    {% endif %}
+  </{{ 'div' if about_embedded else 'main' }}>
+{% if not about_embedded %}
+</body>
+</html>
+{% endif %}

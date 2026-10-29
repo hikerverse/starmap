@@ -75,6 +75,12 @@ The configuration covers `hikerverse.org`, not `www.hikerverse.org`.
 
 ## Controls
 
+**Help → About StarExplorer & methods** opens a draggable, resizable in-app window like the user
+guide. Close it with **Close** or Escape without disturbing the map. It describes the tool,
+astronomical data sources, statistical planet generation,
+SQLite snapshots, scenarios, provenance and scientific limitations. The existing **User guide**
+remains the step-by-step reference for controls. A standalone `/about` page is also available.
+
 ### Subspace disturbance
 
 Open **View → Subspace disturbance...** for a separate, draggable settings window, then enable

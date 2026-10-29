@@ -36,6 +36,7 @@
       <summary>Help</summary>
       <div class="menu-commands">
         <button id="open-guide" aria-controls="guide-dialog" title="How to use StarExplorer (shortcut: ?)">User guide <kbd>?</kbd></button>
+        <button id="open-about" type="button" aria-controls="about-dialog" title="About StarExplorer, data and methods">About StarExplorer &amp; methods</button>
       </div>
     </details>
     <span id="advanced-filter-status" role="status" aria-live="polite">Advanced filters off</span>
@@ -224,6 +225,16 @@
     <div id="scale-info"></div>
     <div id="camera-info" title="Camera position in galactic coordinates (Sol at the origin; X towards the Galactic Centre, Z towards the North Galactic Pole), and its distance from the selected object (or the rotation centre when nothing is selected)"></div>
   </div>
+
+  <dialog id="about-dialog" aria-labelledby="about-title">
+    <header class="about-heading">
+      <h2 id="about-title" title="Drag to move this window">About StarExplorer &amp; methods</h2>
+      <button id="close-about" type="button" aria-label="Close About StarExplorer">Close</button>
+    </header>
+    {% with about_embedded = true %}
+      {% include 'about.html' %}
+    {% endwith %}
+  </dialog>
 
   <dialog id="guide-dialog" aria-labelledby="guide-title">
     <header class="guide-hero" title="Drag to move · double-click to reset size and position">
