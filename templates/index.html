@@ -19,6 +19,7 @@
   <div id="labels"></div>
 
   <nav id="top-menu" aria-label="Application menu">
+    <button id="toggle-controls" type="button" aria-expanded="false" aria-controls="sidebar">Controls</button>
     <details id="view-menu">
       <summary>View</summary>
       <div class="menu-commands">
@@ -72,7 +73,10 @@
   </dialog>
 
   <div id="sidebar" class="panel">
-    <h1>StarExplorer</h1>
+    <div class="sidebar-heading">
+      <h1>StarExplorer</h1>
+      <button id="close-controls" type="button" aria-label="Close display controls">Close</button>
+    </div>
     <div id="star-count"></div>
     <div class="toolbar">
       <label class="frame-row" title="Galactic: X towards the Galactic Centre, Y towards l = 90&deg;, Z towards the North Galactic Pole (right-handed). Equatorial: J2000, X towards RA 0h, Z towards the North Celestial Pole.">
@@ -145,6 +149,7 @@
   <div id="details" class="panel hidden">
     <button id="close-details" title="Close">&times;</button>
     <h2 id="d-name"></h2>
+    <button id="focus-selected" type="button">Centre on object</button>
     <table>
       <tr><th id="h-class">Spectral class</th><td id="d-class"></td></tr>
       <tr id="row-type" hidden><th>Type</th><td id="d-type"></td></tr>
@@ -188,8 +193,11 @@
   </div>
 
   <div id="help" class="panel">
+    <div class="desktop-hints">
     <b>Left-drag</b> rotate &middot; <b>Right-drag / Shift+drag</b> pan &middot; <b>Scroll</b> zoom<br>
     <b>Click</b> star for details &middot; <b>Double-click</b> star to centre on it from 3 pc away
+    </div>
+    <div class="touch-hints">Drag to rotate &middot; Pinch to zoom &middot; Two fingers to pan<br>Tap an object for details, then Centre on object</div>
     <div id="centre-info"></div>
     <div id="selection-distance" role="status" aria-live="polite"></div>
     <div id="scale-info"></div>

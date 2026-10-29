@@ -8,6 +8,10 @@ html, body {
 }
 
 #canvas-container { position: fixed; inset: 0; }
+#canvas-container canvas { display: block; touch-action: none; }
+#toggle-controls, #close-controls, .touch-hints { display: none; }
+.sidebar-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#focus-selected { margin-bottom: 8px; }
 
 #top-menu {
   position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 10;
@@ -395,3 +399,74 @@ kbd {
   #guide-title { margin: 0; font-size: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { #guide-dialog[open] { animation: none; } }
+
+@media (pointer: coarse) {
+  button, select, input:not([type="checkbox"]), .menu-commands button,
+  #orientation-views button, #view-system, #close-details, #close-system, #close-star-panel {
+    min-height: 44px;
+  }
+  button, #orientation-views button { min-width: 44px; }
+  input[type="checkbox"] { width: 20px; height: 20px; vertical-align: middle; }
+  .toolbar label, #star-list li, #planet-list li, #sovereignty-list li { min-height: 44px; box-sizing: border-box; }
+  .toolbar label { display: flex; align-items: center; gap: 6px; }
+  .desktop-hints { display: none; }
+  .touch-hints { display: block; }
+  #star-search, #distance-filter, #filter-dialog input:not([type="checkbox"]), #filter-dialog select,
+  #frame-select, #colour-mode, #scenario-select { font-size: 16px; }
+}
+
+@media (max-width: 1024px) {
+  #top-menu { height: 48px; gap: 8px; padding: 0 8px; }
+  #toggle-controls, #close-controls { display: block; }
+  #view-menu summary, #help-menu summary { padding: 12px 6px; }
+  #sidebar {
+    display: none; z-index: 9; top: 56px; left: 8px; width: min(320px, calc(100vw - 16px));
+    max-height: calc(100dvh - 72px); box-sizing: border-box; background: rgba(10, 16, 32, 0.97);
+  }
+  #sidebar.controls-open { display: flex; }
+  #details, #star-panel, #system-panel {
+    box-sizing: border-box; z-index: 6; top: 56px !important; left: auto !important; right: 8px !important;
+    width: min(400px, calc(100vw - 16px)); max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 190px); overflow-y: auto;
+  }
+  #star-panel { height: min(520px, calc(100dvh - 190px)); min-height: 0; z-index: 7; }
+  #system-panel { width: min(640px, calc(100vw - 16px)); z-index: 8; }
+  #details h2 { padding-right: 36px; overflow-wrap: anywhere; }
+  #details td { overflow-wrap: anywhere; }
+  #help {
+    left: 144px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); max-width: none;
+    transform: none; padding: 8px; font-size: 11px; white-space: normal; max-height: 112px; overflow-y: auto;
+  }
+  #orientation-widget {
+    left: 8px; bottom: max(8px, env(safe-area-inset-bottom)); width: 128px; height: 128px;
+    padding: 0; flex-direction: column; gap: 0;
+  }
+  #orientation-canvas { width: 72px; height: 72px; }
+  #orientation-widget h2, #orientation-legend { display: none; }
+  #orientation-views { gap: 0; margin: 0; }
+  #orientation-views button { padding: 4px; min-width: 40px; }
+  #filter-dialog {
+    left: 8px !important; top: 56px !important; right: auto; margin: 0; width: calc(100vw - 16px);
+    max-height: calc(100dvh - 72px); padding: 12px;
+  }
+  #guide-dialog {
+    left: 8px !important; top: 56px !important; right: auto; bottom: auto; margin: 0;
+    width: calc(100vw - 16px) !important; height: calc(100dvh - 72px) !important;
+    min-width: 0; min-height: 0; resize: none;
+  }
+  .filter-group { padding: 8px; margin-left: 0; margin-right: 0; }
+}
+
+@media (max-width: 600px) {
+  #details, #star-panel, #system-panel { max-height: calc(100dvh - 210px); }
+  #star-panel { height: min(420px, calc(100dvh - 210px)); }
+  #camera-info { display: none; }
+  #help { max-height: 120px; }
+}
+
+@media (max-width: 1024px) and (max-height: 500px) {
+  #details, #star-panel, #system-panel { max-height: calc(100dvh - 72px); }
+  #star-panel { height: calc(100dvh - 72px); }
+  #help { max-height: 72px; }
+  #camera-info, #scale-info, .desktop-hints, .touch-hints { display: none; }
+}
