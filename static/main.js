@@ -117,7 +117,7 @@ const container = document.getElementById('canvas-container');
 const labelLayer = document.getElementById('labels');
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 container.appendChild(renderer.domElement);
 
@@ -1170,6 +1170,7 @@ function selectStar(i) {
   }
   const isNebula = kind[i] === KIND_NEBULA;
   const isGalaxy = kind[i] === KIND_GALAXY;
+  document.getElementById('focus-selected').hidden = isGalaxy;
   document.getElementById('h-class').textContent = isNebula ? 'Class' : isGalaxy ? 'Morphology' : 'Spectral class';
   document.getElementById('row-absmag').hidden = isNebula || (isGalaxy && typeof d.abs_mag !== 'number');
   document.getElementById('h-absmag').textContent = isGalaxy ? 'Absolute magnitude (V, approx.)' : 'Absolute magnitude';
@@ -1314,11 +1315,20 @@ document.querySelectorAll('[data-view-plane]').forEach((button) => {
   });
 });
 
-// ---------- Mouse / keyboard ----------
+// ---------- Pointer / keyboard ----------
 let downPos = null;
-renderer.domElement.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY }; });
+const activePointers = new Set();
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  activePointers.add(e.pointerId);
+  downPos = activePointers.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+});
+renderer.domElement.addEventListener('pointercancel', (e) => {
+  activePointers.delete(e.pointerId);
+  downPos = null;
+});
 renderer.domElement.addEventListener('pointerup', (e) => {
-  if (!downPos || e.button !== 0) return;
+  activePointers.delete(e.pointerId);
+  if (!downPos || downPos.id !== e.pointerId || e.button !== 0) return;
   const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
   downPos = null;
   if (moved > CLICK_MOVE_TOLERANCE) return; // it was a drag, not a click
@@ -1331,7 +1341,8 @@ renderer.domElement.addEventListener('dblclick', (e) => {
 
 let hoverEvent = null;
 renderer.domElement.addEventListener('pointermove', (e) => {
-  if (e.buttons) return;
+  if (downPos && Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > CLICK_MOVE_TOLERANCE) downPos = null;
+  if (e.buttons || e.pointerType === 'touch') return;
   if (!hoverEvent) {
     requestAnimationFrame(() => {
       renderer.domElement.style.cursor = pickStar(hoverEvent.clientX, hoverEvent.clientY) >= 0 ? 'pointer' : 'grab';
@@ -1364,8 +1375,27 @@ document.getElementById('show-all').addEventListener('click', () => {
   showAll();
 });
 const topMenus = [...document.querySelectorAll('#top-menu details')];
+const compactLayout = window.matchMedia('(max-width: 1024px)');
+const sidebar = document.getElementById('sidebar');
+const controlsButton = document.getElementById('toggle-controls');
+function setControlsOpen(open) {
+  sidebar.classList.toggle('controls-open', open);
+  controlsButton.setAttribute('aria-expanded', String(open));
+  sidebar.inert = compactLayout.matches && !open;
+}
+controlsButton.addEventListener('click', () => setControlsOpen(!sidebar.classList.contains('controls-open')));
+document.getElementById('close-controls').addEventListener('click', () => {
+  setControlsOpen(false);
+  controlsButton.focus();
+});
+compactLayout.addEventListener('change', () => setControlsOpen(false));
+setControlsOpen(false);
+document.getElementById('focus-selected').addEventListener('click', () => {
+  if (selected >= 0) focusStar(selected);
+});
 document.addEventListener('pointerdown', (event) => {
   for (const menu of topMenus) if (!menu.contains(event.target)) menu.open = false;
+  if (compactLayout.matches && !sidebar.contains(event.target) && !controlsButton.contains(event.target)) setControlsOpen(false);
 });
 for (const menu of topMenus) {
   menu.addEventListener('toggle', () => {
@@ -1677,6 +1707,11 @@ window.addEventListener('keydown', (e) => {
   if (filterDialog.open) { filterDialog.close(); return; }
   const openMenu = topMenus.find((menu) => menu.open);
   if (openMenu) { openMenu.open = false; return; }
+  if (compactLayout.matches && sidebar.classList.contains('controls-open')) {
+    setControlsOpen(false);
+    controlsButton.focus();
+    return;
+  }
   if (!starPanel.classList.contains('hidden') && starPanel.contains(document.activeElement)) {
     if (document.activeElement === searchEl && searchEl.value) { // first Escape clears the search
       e.preventDefault();

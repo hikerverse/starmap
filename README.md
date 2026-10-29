@@ -17,6 +17,12 @@ The ~12 MB star file is served gzip-compressed (~2.8 MB) and cached in memory un
 
 ## Controls
 
+On tablets and phones (up to 1024 px wide), **Controls** opens a collapsible display-controls panel.
+Tap **Close** or the map to dismiss it. Object details, search, filters, planetary systems and the user
+guide fit the smaller viewport; long panels scroll, and planetary tables scroll horizontally.
+With a touchscreen, drag with one finger to rotate, pinch to zoom, and move two fingers to pan.
+Tap an object for details, then use **Centre on object** to fly to it without needing a double-click.
+
 | Action | Effect |
 | --- | --- |
 | Left-drag | Rotate around the current centre |
