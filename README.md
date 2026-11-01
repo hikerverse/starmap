@@ -4,6 +4,9 @@ A Flask web app with a three.js front end that renders an interactive 3D map of 
 It ships with ~107,000 stars from the HYG catalogue (everything within ~1 kpc that has a distance and
 spectral class).
 
+Three.js 0.160.0 and its OrbitControls add-on are served locally from `static/vendor/three`;
+the included license is in that directory. The browser does not need to fetch Three.js from a CDN.
+
 ## Run
 
 ```powershell
