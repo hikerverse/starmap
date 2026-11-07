@@ -133,6 +133,7 @@
       <label><input type="checkbox" id="toggle-blackhole" checked> Black holes <span class="blackhole-key">&#9711;</span></label>
       <label><input type="checkbox" id="toggle-nebula" checked> Nebulae <span class="nebula-key">&#10059;</span></label>
       <div id="nebula-filter" class="chip-row" title="Nebula type filter"></div>
+      <label title="Milky Way centred on Sagittarius A*, with spiral-arm fits from Reid et al. (2019), including the Local (Orion) Arm near Sol. Fades in when zoomed out. Cloud detail is illustrative; arm locations are uncertain."><input type="checkbox" id="toggle-milky-way" checked> Milky Way</label>
       <label title="Curated well-known galaxies and galaxy clusters beyond the Milky Way, at their real distances. Click one for details; they cannot be made the centre of rotation."><input type="checkbox" id="toggle-galaxy" checked> Extragalactic <span class="galaxy-key">&#11053;</span></label>
       <label class="distance-row" title="Only show objects within this distance of the selected star (or the rotation centre when nothing is selected). Leave empty to show everything. Extragalactic objects are not affected.">
         Show within <input type="number" id="distance-filter" min="0" step="any" placeholder="all"> pc
@@ -303,6 +304,15 @@
               black holes <span class="blackhole-key">&#9711;</span>, nebulae <span class="nebula-key">&#10059;</span> and galaxies <span class="galaxy-key">&#11053;</span>.
               The chips below them filter by spectral class (O B A F G K M) and nebula type.</dd>
             <dt>Grid &amp; labels</dt><dd>Toggle the reference grid with drop lines, and the name labels.</dd>
+            <dt>Milky Way</dt><dd>A translucent spiral disk and central bulge centred on Sagittarius A*,
+              about 8,178 pc from Sol, with mottled arms, dust lanes and pink star-forming clouds.
+              Zoom out to see the local stars in galactic context.
+              It fades in between viewing distances of 500 and 6,000 pc.
+              Arm paths and widths follow <a href="https://arxiv.org/html/1910.03357v1#A2.T2" target="_blank" rel="noopener">Reid et al. (2019)</a>,
+              including the <b>Local (Orion) Arm</b> around Sol, between Sagittarius and Perseus.
+              Arms taper beyond the measured ranges; the unmeasured far side stays diffuse.
+              Star positions are unchanged. Cloud detail, the bar and disk thickness remain illustrative;
+              this uncertain model does not assign individual stars to arms. The checkbox is saved with your view.</dd>
             <dt>Show within</dt><dd>Quickly limit the map to objects within a number of parsecs of the selected star (or the centre when nothing is selected).</dd>
             <dt>Subspace disturbance</dt><dd>Open <b>View &rarr; Subspace disturbance...</b> for an optional fictional volumetric field within 1,200 pc of Sol.
               Change <b>Seed</b> or use <b>Regenerate</b> for a different field; the same seed and generation

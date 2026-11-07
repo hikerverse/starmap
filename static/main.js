@@ -5,6 +5,7 @@ import { createFilterBuilder } from './filter-builder.js';
 import { clearPrefs, loadPrefs, savePrefs, storageAvailable } from './prefs.js';
 import { createSubspace } from './subspace.js';
 import { disturbanceAt, SUBSPACE_RADIUS_PC } from './subspace-field.js';
+import { createMilkyWay } from './milky-way.js';
 
 // ---------- Tunables ----------
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
@@ -124,6 +125,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+const milkyWay = createMilkyWay(renderer, scene);
+const milkyWayToggle = document.getElementById('toggle-milky-way');
 const subspace = createSubspace(renderer, scene);
 const displayToGalactic = new THREE.Matrix4();
 const equatorialToGalactic = new THREE.Matrix4().setFromMatrix3(EQ_TO_GAL);
@@ -1680,6 +1683,7 @@ bindKindToggle('toggle-stars', 0, 'uShowStar');
 bindKindToggle('toggle-neutron', KIND_NEUTRON, 'uShowNeutron');
 bindKindToggle('toggle-blackhole', KIND_BLACK_HOLE, 'uShowBlackHole');
 bindKindToggle('toggle-nebula', KIND_NEBULA, 'uShowNebula');
+milkyWayToggle.addEventListener('change', () => persist());
 bindKindToggle('toggle-galaxy', KIND_GALAXY, 'uShowGalaxy');
 document.getElementById('frame-select').addEventListener('change', (e) => setFrame(e.target.value));
 
@@ -1909,6 +1913,10 @@ async function init() {
     counts.push(`${list.length} ${OVERLAYS[k].label}`);
   }
 
+  const galacticCentre = records.find((r) => r.name === 'Sagittarius A*');
+  if (galacticCentre) {
+    milkyWay.setCentre(new THREE.Vector3(galacticCentre.x, galacticCentre.y, galacticCentre.z).applyMatrix3(EQ_TO_GAL));
+  }
   N = records.length;
   firstSpecial = db.stars.length;
   pos = new Float32Array(3 * N);
@@ -1978,7 +1986,7 @@ function finishLoading() {
 
 // ---------- Saved settings (localStorage) ----------
 const SAVED_TOGGLES = ['toggle-grid', 'toggle-labels', 'toggle-stars', 'toggle-neutron', 'toggle-blackhole',
-  'toggle-nebula', 'toggle-galaxy', 'toggle-unclaimed', 'toggle-confirmed'];
+  'toggle-nebula', 'toggle-milky-way', 'toggle-galaxy', 'toggle-unclaimed', 'toggle-confirmed'];
 let restoring = false;
 
 function filterLookups() {
@@ -2690,6 +2698,7 @@ function loop(now) {
   updateOrientation();
   if (frame === 'galactic') displayToGalactic.identity();
   else displayToGalactic.copy(equatorialToGalactic);
+  milkyWay.update(camera, displayToGalactic, camera.position.distanceTo(controls.target), milkyWayToggle.checked);
   subspace.update(camera, displayToGalactic);
   renderer.render(scene, camera);
 }

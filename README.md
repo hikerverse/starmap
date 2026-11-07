@@ -279,6 +279,31 @@ type chips (**Emission, Reflection, Planetary, SNR, Dark**) work like the spectr
 toggle, double-click to show only that type. Nebulae are searchable, show up in the nearest list and respect
 the distance filter. The details panel shows catalogue IDs, size and the distance source.
 
+**Milky Way** (above Extragalactic, enabled by default) adds a translucent, procedural spiral disk,
+central bar/bulge and faint halo. Mottled blue-white arms include dark dust lanes,
+stellar flecks and pink star-forming clouds; these details are baked once into a procedural texture
+and viewed through a thin 3D disk. Its centre follows the catalogue position of **Sagittarius A***,
+about 8,178 pc from Sol; if that overlay is unavailable it uses the approximate Galactic Centre
+on the +X axis. The disk lies in the galactic plane, extends to about 15,000 pc in radius, and
+stays aligned when changing coordinate frames. It fades in as the camera-to-view-centre distance
+increases from 500 to 6,000 pc, so local views are unchanged. Zoom out with the wheel to see the
+local catalogue in context; **Show all** still fits the star catalogue only.
+Arm centre-lines follow the parallax-based, kinked logarithmic fits from
+[Reid et al. (2019), Table 2 and Section III](https://arxiv.org/html/1910.03357v1#A2.T2):
+Norma, Scutum-Centaurus, Sagittarius-Carina, Local (Orion), Perseus and Outer.
+Azimuth is zero from the centre towards Sol, increasing in the direction of Galactic rotation.
+The fits' 8.15 kpc solar radius is scaled to the catalogue's centre-to-Sol distance; star positions
+are not moved. At Sol's azimuth, Sagittarius lies inward, Perseus outward, and Sol is within
+the broad Local Arm region, not forced onto its centre-line.
+The published Gaussian widths and their 42 pc/kpc radial gradient set the bands.
+Segments taper outside their measured azimuth ranges over 15 degrees (5 for the Local Arm).
+The largely unmeasured far side stays diffuse, rather than being filled with invented arm paths.
+This is an observationally anchored model, not a definitive arm-membership map: the fits have
+uncertainties, track young star-forming regions rather than all stellar populations, and do not
+include a disk warp. Cloud knots, dust, stellar flecks, disk thickness, bar and halo remain illustrative.
+This backdrop does not affect picking, filters or colour modes, and its checkbox is saved with
+the other browser settings. It renders at reduced resolution and is cached while the camera is still.
+
 **Extragalactic ⬭** toggles 52 well-known galaxies and galaxy clusters, from the Magellanic Clouds out to
 3C 273 (~650 Mpc). They are drawn as tilted elliptical glows at their real distances, so zoom far out to
 see them. Click one (or search by name or catalogue ID, e.g. `M31`, `Whirlpool`) for details. They are a
