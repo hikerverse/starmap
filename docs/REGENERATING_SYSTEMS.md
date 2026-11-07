@@ -8,10 +8,10 @@ simulated galaxy. For how the simulation works, see the
 ## What is stored and what is generated
 
 The generator can produce full systems (planets, orbits, habitable zone, moons) deterministically from a
-seed. The live application now reads **frozen baseline snapshots and published scenarios**; it does not
-generate or write planetary data during requests. See [SCENARIOS.md](SCENARIOS.md) for the runtime workflow.
+seed. The live application reads one complete, normalized SQLite dataset; it does not generate or write
+planetary data during requests. See [DATASETS.md](DATASETS.md) for the runtime workflow.
 
-The following files are generator inputs and the legacy statistics summary, not the live scenario store:
+The following files are generator inputs and the legacy statistics summary, not the live database:
 
 | File | Role | How it is produced |
 | --- | --- | --- |
@@ -71,8 +71,14 @@ K dwarf                     3264    81.6%   13.2%   13.2%    9.3%  0.00%
 ```
 
 The new seed is saved in `systems_summary.json`, and later legacy statistics runs without `--seed` keep
-using it. This does not alter published scenarios. To show a new population, create a new snapshot with
-the desired seed, then select its published scenario.
+using it. This does not alter any existing SQLite dataset. To use the new population, build a new
+standalone database from the refreshed inputs:
+
+```powershell
+.\.venv\Scripts\python tools\manage_datasets.py create `
+  data\seed-42.sqlite --name "Population seed 42" --seed 42
+$env:STAREXPLORER_DATABASE = "data\seed-42.sqlite"
+```
 
 ### 3. Refresh the confirmed exoplanets
 
@@ -92,8 +98,9 @@ the desired seed, then select its published scenario.
 It caches two downloads in `%TEMP%`: `nasa_pscomppars.csv` (the archive table) and `hygdata_v40.csv.gz`
 (the HYG catalogue). Add `--offline` to reuse the cached archive table without querying the archive again.
 
-The second command is optional and prints updated statistics. To use the refreshed observations in the
-map, create a new baseline snapshot. Existing snapshots keep their original observations.
+The second command is optional and prints updated statistics. To use refreshed observations in the map,
+create a separate SQLite dataset with `manage_datasets.py create`, then activate that database.
+Existing databases are unchanged.
 
 ### 4. After re-importing or editing the star catalogue
 
@@ -104,14 +111,16 @@ map, create a new baseline snapshot. Existing snapshots keep their original obse
 ```
 
 Summaries are stored in the same order as `stars.json`. Re-run `fetch_exoplanets.py` so confirmed planets
-attach to the right stars, then create a new baseline for the changed catalogue. Published scenarios
-check catalogue compatibility and reject mismatches instead of attaching planets to the wrong stars.
+attach to the right stars, then create a new dataset with `manage_datasets.py create`. Keep the
+catalogue and its systems in the same order.
 
 ### 5. After editing Sol's data
 
-Edit `data/solar_system.json`, then create a new baseline to capture the change. Alternatively export Sol
-into a scenario override, edit that JSON and publish the scenario. Mark fictional additions as manual;
-they are not confirmed observations. The seed does not change the original observed Solar System planets.
+Edit `data/solar_system.json`, then create a new dataset with `manage_datasets.py create` to capture
+the change. To edit an existing dataset, clone its database and update the normalized `planets` and `moons` rows. Mark
+fictional additions as manual; they are not confirmed observations. Refresh system flags after SQL
+changes as described in [DATASETS.md](DATASETS.md). The seed does not change the original observed
+Solar System planets.
 
 ### 6. After changing the generator code
 
@@ -122,9 +131,8 @@ summary, increase `GENERATOR_VERSION` at the top of the file:
 GENERATOR_VERSION = 3
 ```
 
-Then run `generate_systems.py` to inspect the new statistics and create a new baseline snapshot.
-Bumping the version makes the legacy `systems_summary.json` stale on its next tooling run, but cannot
-change a frozen published population.
+Then run `generate_systems.py` to inspect the new statistics and use `manage_datasets.py create` to
+build a new standalone database. Existing SQLite datasets remain unchanged.
 
 ## Legacy summary rebuilds
 
@@ -137,14 +145,14 @@ When `tools/generate_systems.py` prepares its legacy summary, it records:
 | `star_count`, `names_crc` | Stars are added, removed, renamed or reordered |
 | `known_crc` | `known_planets.json` or `solar_system.json` changes |
 
-These keys identify the legacy generator result. They do not trigger runtime rebuilding. Snapshot and
-scenario publication have their own revision and full-catalogue compatibility checks.
+These keys identify the legacy generator result. They do not trigger runtime rebuilding or mutate a
+standalone dataset.
 
 ## Checking the result
 
 1. Run `generate_systems.py` and check the table. With seed 1, G dwarfs show about 76% with planets
    and 12% potentially habitable (optimistic).
-2. Create a snapshot as described in [SCENARIOS.md](SCENARIOS.md), start the app
+2. Build a database as described in [DATASETS.md](DATASETS.md), start the app
    (`.\.venv\Scripts\python app.py`) and set **Colour by → Planets**. Grey, blue, amber and
    green stars should appear, and the legend counts should be non-zero.
 3. Select a star with confirmed planets, for example "Tau Ceti", "Epsilon Eridani" or
@@ -156,7 +164,7 @@ scenario publication have their own revision and full-catalogue compatibility ch
 
 | Symptom | Cause and fix |
 | --- | --- |
-| The map still shows the old galaxy after `--seed` | Published snapshots are immutable. Create a new baseline with that seed and select its scenario. |
+| The map still shows the old galaxy after `--seed` | The active database is a standalone copy. Create a new dataset and configure the backend to use that database. |
 | `fetch_exoplanets.py` times out | The archive is slow or unreachable. Retry later, or use `--offline` if a cached table exists. |
 | A known exoplanet host has no planets | It may be too faint for HYG or have no spectral type (listed as unmatched in the fetch output). Or its planets were attached to a merged binary partner, e.g. GJ 667 C's planets appear on "Gl 667B". |
-| Scenarios are unavailable | Create/publish a snapshot, check catalogue compatibility, and use **Refresh scenarios**. Check server logs for invalid data or missing files. |
+| The dataset is unavailable | Restore or convert a SQLite database and set `STAREXPLORER_DATABASE` to its path. Check server logs for invalid data or a missing file. |

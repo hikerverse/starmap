@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import scenarios as C
 import systems as S
+import datasets as D
 
 
 class ScenarioTests(unittest.TestCase):
@@ -242,24 +243,27 @@ class ScenarioTests(unittest.TestCase):
 
     def test_wsgi_contract_and_conditional_get(self):
         import app
-        with patch.object(app, "DATA_DIR", self.data), patch.object(app, "STARS_FILE", self.data / "stars.json"):
+        dataset_file = self.data / "dataset.sqlite"
+        D.import_legacy_snapshot(
+            self.data / "scenarios" / "baseline" / f"{self.base['revision']}.sqlite",
+            self.data / "stars.json", dataset_file, "Edited",
+        )
+        with patch.object(app, "DATA_DIR", self.data), patch.object(app, "DATASET_FILE", dataset_file):
             client = app.app.test_client()
             catalogue = client.get("/api/stars")
-            self.assertEqual(catalogue.json["catalogue_fingerprint"], C.fingerprint(self.stars))
-            listing = client.get("/api/scenarios")
-            self.assertEqual(listing.status_code, 200)
-            self.assertEqual(listing.json["names_crc"], S.names_crc(self.stars))
-            url = f"/api/systems-summary?scenario=edited&revision={self.edit['revision']}"
+            self.assertEqual(catalogue.status_code, 200)
+            self.assertEqual(client.get("/api/scenarios").status_code, 404)
+            url = "/api/systems-summary"
             summary = client.get(url)
             self.assertEqual(summary.status_code, 200)
-            self.assertEqual(summary.json["revision"], self.edit["revision"])
+            self.assertEqual(summary.json["name"], "Edited")
+            self.assertEqual(catalogue.json["catalogue_fingerprint"], summary.json["catalogue_fingerprint"])
             self.assertEqual(client.get(url, headers={"If-None-Match": summary.headers["ETag"]}).status_code, 304)
-            system = client.get(f"/api/system/Sol?scenario=edited&revision={self.edit['revision']}")
-            self.assertEqual(system.json["scenario_id"], "edited")
-            self.assertEqual(client.get("/api/system/unknown?scenario=edited").status_code, 404)
-            self.assertEqual(client.get("/api/systems-summary?scenario=edited&revision=missing").status_code, 409)
+            system = client.get("/api/system/Sol")
+            self.assertEqual(system.json["dataset_id"], summary.json["dataset_id"])
+            self.assertEqual(client.get("/api/system/unknown").status_code, 404)
             app._systems_state.clear()
-            app.scenario_summary_payload.cache_clear()
+            app.dataset_summary_payload.cache_clear()
 
     def test_purge_preview_and_cleanup_preserve_current_data(self):
         path, value = self.override()

@@ -40,7 +40,7 @@ export function compileFilter(tree, data) {
       }
       test = (i) => kind[i] === 0 && sovOf[i] === node.value;
     } else if (node.type === 'planet' || node.type === 'confirmed') {
-      if (!planetCat || !planetFlags) throw new Error('Planetary scenario data is not available yet. Try again after it loads.');
+      if (!planetCat || !planetFlags) throw new Error('Planetary dataset is not available yet. Try again after it loads.');
       if (node.type === 'planet') {
         if (!Number.isInteger(node.value) || node.value < 0 || node.value > 3) throw new Error('Choose a planetary category.');
         test = (i) => kind[i] === 0 && planetCat[i] === node.value;

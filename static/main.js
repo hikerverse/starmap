@@ -289,10 +289,9 @@ let advancedFilter = emptyFilter();
 let filterGalaxies = false;
 let advancedMask = null, advancedMaskAttr = null;
 let filterBuilder = null;
-// Saved settings that need planetary data wait here (and are kept in storage) until a scenario loads
+// Saved settings that need planetary data wait here until the active dataset loads
 let pendingFilterText = null;
 let pendingColourMode = null;
-let pendingScenario = null;
 
 function filterData() {
   return { records, kind, specClass, sovOf, sovereignties, planetCat, planetFlags };
@@ -1962,7 +1961,7 @@ async function init() {
   stepAnimation(performance.now());
   restorePrefs();
   renderList();
-  loadScenarios();
+  loadDataset();
 }
 
 // ---------- Saved settings (localStorage) ----------
@@ -1979,7 +1978,6 @@ function savedState() {
   return {
     frame,
     colourMode: pendingColourMode ?? colourMode,
-    scenario: activeScenario?.id ?? pendingScenario,
     toggles: Object.fromEntries(SAVED_TOGGLES.map((id) => [id, document.getElementById(id).checked])),
     spectralClasses: [...classVisible],
     nebulaTypes: [...nebTypeVisible],
@@ -2014,7 +2012,7 @@ function applyPendingFilter() {
     applyAdvancedFilter(tree, includeGalaxies);
     filterBuilder.setApplied(tree, includeGalaxies);
   } catch (err) {
-    // Filters with planet conditions wait for scenario data; anything else is invalid and dropped
+    // Filters with planet conditions wait for dataset data; anything else is invalid and dropped
     if (planetCat) {
       console.warn('Saved filter could not be restored:', err.message);
       pendingFilterText = null;
@@ -2064,7 +2062,6 @@ function restorePrefs() {
       document.getElementById('colour-mode').value = colourMode;
     }
     applyColourState();
-    if (typeof prefs.scenario === 'string') pendingScenario = prefs.scenario;
     const radius = parseFloat(prefs.distance);
     if (Number.isFinite(radius) && radius > 0) {
       document.getElementById('distance-filter').value = String(radius);
@@ -2152,14 +2149,11 @@ const PLANET_TYPE_COLOURS = {
 };
 let systemIndex = -1;
 let systemRequest = 0;
-let scenarioRequest = 0;
-let activeScenario = null;
-let scenarioCatalogue = null;
+let datasetRequest = 0;
+let activeDataset = null;
 let catalogueFingerprint = null;
-let scenarios = [];
-let scenariosLoading = false;
-const scenarioSelect = document.getElementById('scenario-select');
-const scenarioStatus = document.getElementById('scenario-status');
+let datasetLoading = false;
+const datasetStatus = document.getElementById('dataset-status');
 
 function catalogueNamesCrc() {
   let crc = 0xffffffff;
@@ -2171,7 +2165,7 @@ function catalogueNamesCrc() {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-async function scenarioJson(url) {
+async function datasetJson(url) {
   const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text();
@@ -2185,100 +2179,29 @@ async function scenarioJson(url) {
   return res.json();
 }
 
-function scenarioUrl(path, scenario) {
-  const query = new URLSearchParams({ scenario: scenario.id, revision: scenario.revision });
-  return `${path}?${query}`;
+function setDatasetStatus(message, error = false) {
+  datasetStatus.textContent = message;
+  datasetStatus.classList.toggle('error', error);
 }
 
-function setScenarioStatus(message, error = false) {
-  scenarioStatus.textContent = message;
-  scenarioStatus.classList.toggle('error', error);
-}
-
-scenarioSelect.addEventListener('change', () => {
-  const scenario = scenarios.find((s) => s.id === scenarioSelect.value);
-  if (scenario) loadPlanets(scenario);
-});
-document.getElementById('reload-scenarios').addEventListener('click', loadScenarios);
-
-async function loadScenarios() {
-  const request = ++scenarioRequest;
-  scenariosLoading = true;
+async function loadDataset() {
+  const request = ++datasetRequest;
+  datasetLoading = true;
   systemRequest++;
-  scenarioSelect.disabled = true;
-  setScenarioStatus('Loading published scenarios...');
+  setDatasetStatus('Loading active dataset...');
   if (selected >= 0) updatePlanetRow(selected);
   try {
-    const catalogue = await scenarioJson('/api/scenarios');
-    if (request !== scenarioRequest) return;
-    if (catalogue.names_crc !== catalogueNamesCrc() || !catalogueFingerprint
-      || catalogue.catalogue_fingerprint !== catalogueFingerprint) {
-      throw new Error('Scenarios do not match this star catalogue. Reload the page.');
-    }
-    if (!catalogue.scenarios?.length) throw new Error('No published scenarios. Create a snapshot with tools\\manage_scenarios.py.');
-    scenarios = catalogue.scenarios;
-    scenarioCatalogue = catalogue;
-    scenarioSelect.replaceChildren(...scenarios.map((s) => {
-      const option = document.createElement('option');
-      option.value = s.id;
-      option.textContent = s.name;
-      return option;
-    }));
-    const scenario = scenarios.find((s) => s.id === activeScenario?.id)
-      ?? scenarios.find((s) => s.id === pendingScenario)
-      ?? scenarios.find((s) => s.id === catalogue.default_scenario);
-    pendingScenario = null;
-    if (!scenario) throw new Error('Default scenario is not published.');
-    scenarioSelect.value = scenario.id;
-    await loadPlanets(scenario);
-  } catch (err) {
-    if (request !== scenarioRequest) return;
-    finishScenarioError(err);
-  }
-}
-
-function finishScenarioError(err) {
-  scenariosLoading = false;
-  console.error('Scenario loading failed:', err);
-  setScenarioStatus(`Could not load scenario: ${err.message}. Use Refresh scenarios after publishing or fixing the data.`, true);
-  scenarioSelect.disabled = !scenarios.length;
-  if (activeScenario) scenarioSelect.value = activeScenario.id;
-  else {
-    const option = document.getElementById('colour-mode').querySelector('option[value="planets"]');
-    option.textContent = 'Planets (unavailable)';
-    if (!scenarios.length) scenarioSelect.options[0].textContent = 'Scenarios unavailable';
-  }
-  if (selected >= 0) updatePlanetRow(selected);
-  if (systemIndex >= 0 && activeScenario) showSystem(systemIndex);
-}
-
-async function loadPlanets(scenario) {
-  const request = ++scenarioRequest;
-  scenariosLoading = true;
-  systemRequest++;
-  scenarioSelect.disabled = false;
-  setScenarioStatus(`Loading ${scenario.name}...`);
-  if (selected >= 0) updatePlanetRow(selected);
-  if (systemIndex >= 0) {
-    document.getElementById('s-planets').replaceChildren();
-    document.getElementById('s-diagram').replaceChildren();
-    document.getElementById('s-badge').replaceChildren();
-    for (const id of ['s-star', 's-hz', 's-notes']) document.getElementById(id).textContent = '';
-    document.getElementById('s-star').textContent = `Loading ${scenario.name}...`;
-  }
-  const option = document.getElementById('colour-mode').querySelector('option[value="planets"]');
-  try {
-    const summary = await scenarioJson(scenarioUrl('/api/systems-summary', scenario));
-    if (request !== scenarioRequest) return;
-    if (summary.scenario_id !== scenario.id || summary.revision !== scenario.revision
-      || summary.catalogue_fingerprint !== scenarioCatalogue.catalogue_fingerprint
-      || summary.names_crc !== scenarioCatalogue.names_crc
+    const summary = await datasetJson('/api/systems-summary');
+    if (request !== datasetRequest) return;
+    if (!summary.dataset_id || !summary.name || !catalogueFingerprint
+      || summary.names_crc !== catalogueNamesCrc()
+      || summary.catalogue_fingerprint !== catalogueFingerprint
       || summary.planets.length !== firstSpecial || summary.flags.length !== firstSpecial) {
-      throw new Error('Scenario summary does not match the requested revision and star catalogue');
+      throw new Error('Active dataset does not match the loaded star catalogue. Reload the page.');
     }
     if (!summary.planets.every((n) => Number.isInteger(n) && n >= 0 && n <= 65535)
       || !summary.flags.every((f) => Number.isInteger(f) && f >= 0 && f <= 255)) {
-      throw new Error('Scenario summary has invalid counts or flags');
+      throw new Error('Dataset summary has invalid counts or flags');
     }
     planetCount = new Uint16Array(N);
     planetFlags = new Uint8Array(N);
@@ -2293,12 +2216,12 @@ async function loadPlanets(scenario) {
       planetCat[i] = c;
       planetColours.set(rgb[c], 3 * i);
     }
+    activeDataset = { id: summary.dataset_id, name: summary.name };
+    datasetLoading = false;
+    setDatasetStatus(`Active dataset: ${summary.name}`);
+    const option = document.getElementById('colour-mode').querySelector('option[value="planets"]');
     option.textContent = 'Planets';
     option.disabled = false;
-    activeScenario = { ...scenario };
-    scenariosLoading = false;
-    scenarioSelect.value = scenario.id;
-    setScenarioStatus(`${scenario.name} · ${scenario.revision.slice(0, 8)}`);
     refreshAdvancedMask();
     renderPlanetLegend();
     if (pendingColourMode === 'planets') {
@@ -2311,8 +2234,21 @@ async function loadPlanets(scenario) {
     if (selected >= 0) updatePlanetRow(selected);
     if (systemIndex >= 0) showSystem(systemIndex);
   } catch (err) {
-    if (request === scenarioRequest) finishScenarioError(err);
+    if (request !== datasetRequest) return;
+    finishDatasetError(err);
   }
+}
+
+function finishDatasetError(err) {
+  datasetLoading = false;
+  console.error('Active dataset loading failed:', err);
+  setDatasetStatus(`Could not load active dataset: ${err.message}. Check the backend database setting.`, true);
+  if (!activeDataset) {
+    const option = document.getElementById('colour-mode').querySelector('option[value="planets"]');
+    option.textContent = 'Planets (unavailable)';
+  }
+  if (selected >= 0) updatePlanetRow(selected);
+  if (systemIndex >= 0 && activeDataset) showSystem(systemIndex);
 }
 
 function renderPlanetLegend() {
@@ -2355,14 +2291,14 @@ function updatePlanetRow(i) {
   }
   const text = document.getElementById('d-planets');
   const button = document.getElementById('view-system');
-  if (scenariosLoading || !planetCount) {
-    text.textContent = scenariosLoading ? 'loading scenario...' : 'scenario unavailable';
+  if (datasetLoading || !planetCount) {
+    text.textContent = datasetLoading ? 'loading dataset...' : 'dataset unavailable';
     button.disabled = true;
     return;
   }
   button.disabled = false;
   const n = planetCount[i], f = planetFlags[i];
-  const parts = [n === 0 ? 'none' : `${n} ${f & PF_MANUAL ? 'scenario' : f & PF_CONFIRMED ? 'confirmed' : 'simulated'} planet${n === 1 ? '' : 's'}`];
+  const parts = [n === 0 ? 'none' : `${n} ${f & PF_MANUAL ? 'dataset' : f & PF_CONFIRMED ? 'confirmed' : 'simulated'} planet${n === 1 ? '' : 's'}`];
   if (f & PF_HABITABLE) parts.push('potentially habitable');
   else if (f & PF_HAB_MOON) parts.push('habitable moon');
   else if (f & PF_HZ) parts.push('in habitable zone');
@@ -2432,7 +2368,7 @@ const svgEl = (tag, attrs) => {
 };
 
 async function showSystem(i) {
-  if (scenariosLoading || !activeScenario) return;
+  if (datasetLoading || !activeDataset) return;
   systemIndex = i;
   const request = ++systemRequest;
   const panel = document.getElementById('system-panel');
@@ -2443,9 +2379,9 @@ async function showSystem(i) {
   document.getElementById('s-star').textContent = 'Loading…';
   panel.classList.remove('hidden');
   try {
-    const system = await scenarioJson(scenarioUrl(`/api/system/${encodeURIComponent(records[i].name)}`, activeScenario));
-    if (system.scenario_id !== activeScenario.id || system.revision !== activeScenario.revision) {
-      throw new Error('System does not match the selected scenario revision');
+    const system = await datasetJson(`/api/system/${encodeURIComponent(records[i].name)}`);
+    if (system.dataset_id !== activeDataset.id) {
+      throw new Error('System does not match the active dataset');
     }
     if (request === systemRequest) renderSystem(system);
   } catch (err) {
@@ -2458,11 +2394,11 @@ function renderSystem(sys) {
   const st = sys.star, hz = sys.habitable_zone;
   const badge = document.getElementById('s-badge');
   const badges = [sys.flags & PF_MANUAL
-    ? ['simulated', 'Manually edited scenario']
+    ? ['simulated', 'Manually edited dataset']
     : sys.confirmed
     ? ['confirmed', sys.name === 'Sol' ? 'Real Solar System' : 'Confirmed planets · NASA Exoplanet Archive']
     : ['simulated', `Simulated system (seed ${sys.seed})`]];
-  badges.push(['scenario', activeScenario.name]);
+  badges.push(['dataset', activeDataset.name]);
   if (sys.flags & (PF_HABITABLE | PF_HAB_MOON)) badges.push(['habitable', 'Potentially habitable']);
   badge.replaceChildren(...badges.map(([cls, text]) => {
     const b = document.createElement('span');
@@ -2490,7 +2426,7 @@ function renderSystem(sys) {
   if (sys.planets.some((p) => p.mass_kind === 'Msini')) notes.push('≥ : minimum mass (radial velocity, M sin i).');
   if (sys.planets.some((p) => p.mass_estimated || p.radius_estimated)) notes.push('~ : estimated from the mass–radius relation (Chen & Kipping 2017).');
   if (sys.confirmed && sys.planets.some((p) => p.moons_simulated)) notes.push('Exomoons are simulated (none confirmed yet).');
-  if (sys.flags & PF_MANUAL) notes.push('This scenario includes manual changes; these are not confirmed observations.');
+  if (sys.flags & PF_MANUAL) notes.push('This dataset includes manual changes; these are not confirmed observations.');
   else if (!sys.confirmed) notes.push('Planets and moons are a statistically plausible draw from measured occurrence rates, not observations.');
   document.getElementById('s-notes').textContent = notes.join(' ');
 }

@@ -49,7 +49,7 @@
         <button type="button" id="filter-close" aria-label="Close filters">Close</button>
       </div>
       <p id="filter-help">Build ALL / ANY groups. NOT excludes matches. Distance anchors stay fixed when you select another star.
-        Sidebar toggles and the quick distance filter remain additional restrictions. Planet conditions use the active scenario, independently of colour mode.</p>
+        Sidebar toggles and the quick distance filter remain additional restrictions. Planet conditions use the active dataset, independently of colour mode.</p>
       <label><input type="checkbox" id="filter-galaxies"> Apply advanced filters to galaxies too (otherwise kept as a backdrop)</label>
       <div id="filter-rules"></div>
       <p id="filter-error" role="alert"></p>
@@ -112,20 +112,14 @@
           <option value="planets" disabled>Planets (loading&hellip;)</option>
         </select>
       </label>
-      <label class="frame-row" title="Switch between published planetary scenarios without reloading the star map">
-        Scenario <select id="scenario-select" disabled>
-          <option>Loading scenarios&hellip;</option>
-        </select>
-      </label>
-      <div id="scenario-status" role="status" aria-live="polite"></div>
-      <button id="reload-scenarios" title="Refresh published scenario revisions">Refresh scenarios</button>
+      <div id="dataset-status" role="status" aria-live="polite">Loading active dataset&hellip;</div>
       <div id="sovereignty-legend" hidden>
         <label title="Hide stars that do not belong to any sovereignty"><input type="checkbox" id="toggle-unclaimed" checked> Unclaimed stars</label>
         <ul id="sovereignty-list"></ul>
       </div>
       <div id="planet-legend" hidden>
         <ul id="planet-list"></ul>
-        <label title="Only show systems containing observed planets in this scenario; manually authored planets are not observations"><input type="checkbox" id="toggle-confirmed"> Confirmed planets only</label>
+        <label title="Only show systems containing observed planets in this dataset; manually authored planets are not observations"><input type="checkbox" id="toggle-confirmed"> Confirmed planets only</label>
       </div>
       <label><input type="checkbox" id="toggle-grid" checked> Grid &amp; drop lines</label>
       <label><input type="checkbox" id="toggle-labels" checked> Labels</label>
@@ -243,7 +237,7 @@
         <p class="guide-kicker">User guide</p>
         <h2 id="guide-title">Welcome to StarExplorer</h2>
         <p>A 3D map of more than 100,000 real stars around the Sun, plus neutron stars, black holes, nebulae,
-          galaxies and planetary scenarios. Distances are in parsecs (1 pc &asymp; 3.26 light-years).</p>
+          galaxies and planetary systems. Distances are in parsecs (1 pc &asymp; 3.26 light-years).</p>
       </div>
       <button type="button" id="guide-close" aria-label="Close user guide">&times;</button>
     </header>
@@ -255,7 +249,7 @@
         <a href="#guide-sidebar">&#9776; Display controls</a>
         <a href="#guide-list">&#8981; Star list</a>
         <a href="#guide-filters">&#9881; Advanced filters</a>
-        <a href="#guide-planets">&#9790; Planets &amp; scenarios</a>
+        <a href="#guide-planets">&#9790; Planets &amp; datasets</a>
         <a href="#guide-axes">&#10133; Axes &amp; views</a>
         <a href="#guide-saved">&#128190; Saved settings</a>
         <a href="#guide-keys">&#9000; Shortcuts</a>
@@ -339,8 +333,8 @@
         </section>
 
         <section id="guide-planets">
-          <h3><span class="guide-icon">&#9790;</span> Planets &amp; scenarios</h3>
-          <p>Choose a <b>Scenario</b> in the sidebar to load a published set of planetary systems; <em>Refresh scenarios</em> picks up new revisions.
+          <h3><span class="guide-icon">&#9790;</span> Planets &amp; datasets</h3>
+          <p>The backend selects the active complete dataset. To switch datasets, change the server database setting, restart the backend and reload this page.
             With <em>Colour by &rarr; Planets</em>, stars are coloured by their planet category and <em>Confirmed planets only</em> hides invented systems.</p>
           <p>Select a star with planets and press <b>View system</b> to see its orbits, habitable zone and planet table.</p>
         </section>
@@ -353,7 +347,7 @@
 
         <section id="guide-saved">
           <h3><span class="guide-icon">&#128190;</span> Saved settings</h3>
-          <p>Your view, toggles, filters, scenario and open panels are saved automatically in this browser and restored next time.
+          <p>Your view, toggles, filters and open panels are saved automatically in this browser and restored next time.
             Nothing is sent to the server. Use <em>View &rarr; Clear saved data&hellip;</em> to start again from the defaults.</p>
         </section>
 

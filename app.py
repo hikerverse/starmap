@@ -11,13 +11,17 @@ from pathlib import Path
 
 from flask import Flask, Response, abort, render_template, request
 
-import scenarios
+import datasets
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
+_dataset_setting = os.environ.get("STAREXPLORER_DATABASE")
+DATASET_FILE = Path(_dataset_setting) if _dataset_setting else DATA_DIR / "stars.sqlite"
+if not DATASET_FILE.is_absolute():
+    DATASET_FILE = BASE_DIR / DATASET_FILE
+STARS_FILE = DATA_DIR / "stars.json"
 KNOWN_PLANETS_FILE = DATA_DIR / "known_planets.json"
 SOLAR_SYSTEM_FILE = DATA_DIR / "solar_system.json"
-STARS_FILE = BASE_DIR / "data" / "stars.json"
 NEUTRON_STARS_FILE = BASE_DIR / "data" / "neutron_stars.json"
 BLACK_HOLES_FILE = BASE_DIR / "data" / "black_holes.json"
 SOVEREIGNTIES_FILE = BASE_DIR / "data" / "sovereignties.json"
@@ -35,8 +39,7 @@ HEX_COLOUR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 app = Flask(__name__)
 
-# The full HYG import is ~12 MB, so the validated, serialised payload is cached
-# and only rebuilt when the JSON file changes on disk.
+# The complete stellar catalogue is serialized and cached until the active database changes.
 _payload_cache: dict = {}
 
 
@@ -142,11 +145,12 @@ def load_sovereignties(path: Path = SOVEREIGNTIES_FILE) -> dict:
 
 
 def stars_payload(path: Path = STARS_FILE, loader=load_stars) -> tuple[bytes, bytes]:
-    mtime = path.stat().st_mtime_ns
+    stat = path.stat()
     cached = _payload_cache.get(path)
-    if cached is None or cached["mtime"] != mtime:
+    if cached is None or cached["mtime"] != stat.st_mtime_ns or cached["size"] != stat.st_size:
         raw = json.dumps(loader(path), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        cached = {"mtime": mtime, "raw": raw, "gzip": gzip.compress(raw, compresslevel=6)}
+        cached = {"mtime": stat.st_mtime_ns, "size": stat.st_size,
+                  "raw": raw, "gzip": gzip.compress(raw, compresslevel=6)}
         _payload_cache[path] = cached
     return cached["raw"], cached["gzip"]
 
@@ -165,18 +169,18 @@ def json_file_response(path: Path, loader=load_stars) -> Response:
     try:
         raw, compressed = stars_payload(path, loader)
     except (OSError, ValueError) as exc:
-        abort(500, description=str(exc))
+        abort(503 if path == DATASET_FILE else 500, description=str(exc))
     return gzip_response(raw, compressed)
 
 
 @app.route("/api/stars")
 def api_stars():
-    return json_file_response(STARS_FILE, load_catalogue)
+    return json_file_response(DATASET_FILE, load_catalogue)
 
 
 def load_catalogue(path: Path) -> dict:
-    data = load_stars(path)
-    data["catalogue_fingerprint"] = scenarios.fingerprint(data["stars"])
+    data = datasets.DatasetStore(path).catalogue()
+    load_stars_list(data["stars"])
     return data
 
 
@@ -213,13 +217,13 @@ _systems_state: dict = {}
 
 
 def systems_state() -> dict:
-    """Cache only catalogue compatibility metadata; all runtime scenario databases are read-only."""
-    key = (str(DATA_DIR), STARS_FILE.stat().st_mtime_ns, STARS_FILE.stat().st_size)
+    """Cache the active read-only dataset until its file changes."""
+    stat = DATASET_FILE.stat()
+    key = (str(DATASET_FILE.resolve()), stat.st_mtime_ns, stat.st_size)
     with _systems_lock:
         if _systems_state.get("key") != key:
-            stars = load_stars(STARS_FILE)["stars"]
             _systems_state.clear()
-            _systems_state.update(key=key, store=scenarios.Store(DATA_DIR, stars))
+            _systems_state.update(key=key, store=datasets.DatasetStore(DATASET_FILE), stat=stat)
         return dict(_systems_state)
 
 
@@ -235,48 +239,46 @@ def gzip_response(raw: bytes, compressed: bytes) -> Response:
 
 @app.route("/api/systems-summary")
 def api_systems_summary():
-    return scenario_response("summary")
+    return dataset_response("summary")
 
 
 @app.route("/api/system/<path:name>")
 def api_system(name: str):
-    return scenario_response("system", name)
-
-
-@app.route("/api/scenarios")
-def api_scenarios():
-    return scenario_response("list")
+    return dataset_response("system", name)
 
 
 @lru_cache(maxsize=16)
-def scenario_summary_payload(data_dir: str, serialized_meta: str) -> tuple[bytes, bytes]:
-    meta = json.loads(serialized_meta)
-    raw = scenarios.dumps(scenarios.load_summary(Path(data_dir) / "scenarios", meta)).encode("utf-8")
+def dataset_summary_payload(path: str, mtime_ns: int, size: int) -> tuple[bytes, bytes]:
+    raw = json.dumps(datasets.DatasetStore(path).summary(), ensure_ascii=False,
+                     separators=(",", ":"), allow_nan=False).encode("utf-8")
     return raw, gzip.compress(raw, compresslevel=6)
 
 
-def scenario_response(operation: str, name: str | None = None) -> Response:
+def dataset_response(operation: str, name: str | None = None) -> Response:
     try:
-        store = systems_state()["store"]
-        if operation == "list":
-            response = Response(scenarios.dumps(store.list()), mimetype="application/json")
-            response.headers["Cache-Control"] = "no-store"
-            return response
-        meta = store.resolve(request.args.get("scenario"), request.args.get("revision"))
+        state = systems_state()
+        store = state["store"]
+        stat = state["stat"]
         if operation == "summary":
-            raw, compressed = scenario_summary_payload(str(DATA_DIR), scenarios.dumps(meta))
+            raw, compressed = dataset_summary_payload(str(DATASET_FILE), stat.st_mtime_ns, stat.st_size)
             response = gzip_response(raw, compressed)
         else:
-            response = Response(scenarios.dumps(store.system(meta, name)), mimetype="application/json")
+            response = Response(json.dumps(store.system(name), ensure_ascii=False,
+                                           separators=(",", ":"), allow_nan=False), mimetype="application/json")
         response.headers["Cache-Control"] = "no-cache"
-        response.set_etag(f"{meta['scenario_id']}-{meta['revision']}-{operation}-{name or ''}".encode().hex())
+        response.set_etag(
+            f"{store.meta['dataset_id']}-{stat.st_mtime_ns}-{operation}-{name or ''}".encode().hex()
+        )
         return response.make_conditional(request)
-    except scenarios.ScenarioError as exc:
-        app.logger.warning("Scenario request rejected: %s", exc)
-        return Response(scenarios.dumps({"error": str(exc)}), status=exc.status, mimetype="application/json")
+    except datasets.DatasetNotFound as exc:
+        app.logger.warning("Dataset request rejected: %s", exc)
+        return Response(json.dumps({"error": str(exc)}), status=404, mimetype="application/json")
+    except datasets.DatasetError as exc:
+        app.logger.warning("Dataset request rejected: %s", exc)
+        return Response(json.dumps({"error": str(exc)}), status=503, mimetype="application/json")
     except (OSError, ValueError, KeyError, sqlite3.Error):
-        app.logger.exception("Could not read published scenario data")
-        return Response(scenarios.dumps({"error": "Published scenario data is unavailable or invalid. Check the server logs and publish a valid snapshot."}),
+        app.logger.exception("Could not read the active dataset")
+        return Response(json.dumps({"error": "The active dataset is unavailable or invalid. Check the server logs and select a valid database."}),
                         status=503, mimetype="application/json")
 
 

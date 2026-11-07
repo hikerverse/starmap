@@ -9,6 +9,10 @@ the included license is in that directory. The browser does not need to fetch Th
 
 ## Run
 
+The ignored SQLite dataset is not included in Git. Restore `data\stars.sqlite` from a backup, create
+one from the source data, or convert a matching legacy full snapshot using
+[SQLite datasets](docs/DATASETS.md) before starting the app.
+
 ```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
@@ -16,7 +20,9 @@ py -3.13 -m venv .venv
 $env:PORT=5057; .\.venv\Scripts\python app.py   # use another port if 5001 is busy
 ```
 
-The ~12 MB star file is served gzip-compressed (~2.8 MB) and cached in memory until the file changes.
+The map and planetary systems are loaded from the active standalone SQLite dataset. The default file
+is `data/stars.sqlite`; see [SQLite datasets](docs/DATASETS.md) to import it or clone and activate a
+different dataset.
 
 ### Run with Gunicorn on Linux
 
@@ -81,7 +87,7 @@ The configuration covers `hikerverse.org`, not `www.hikerverse.org`.
 **Help → About StarExplorer & methods** opens a draggable, resizable in-app window like the user
 guide. Close it with **Close** or Escape without disturbing the map. It describes the tool,
 astronomical data sources, statistical planet generation,
-SQLite snapshots, scenarios, provenance and scientific limitations. The existing **User guide**
+SQLite datasets, provenance and scientific limitations. The existing **User guide**
 remains the step-by-step reference for controls. A standalone `/about` page is also available.
 
 ### Subspace disturbance
@@ -90,7 +96,7 @@ Open **View → Subspace disturbance...** for a separate, draggable settings win
 **Show subspace disturbance** for an illustrative, static volumetric field
 within 1,200 pc of Sol. Domain-warped filaments run through a weak background, with cores typically
 a few parsecs across. This is fictional spatial data, independent of the astronomical catalogue and
-planetary scenarios; it does not change object visibility, picking or filters.
+planetary data; it does not change object visibility, picking or filters.
 The window is non-blocking so you can navigate the map while adjusting it. **Close** or Escape
 closes the window without disabling the layer or discarding settings.
 
@@ -146,10 +152,10 @@ clears a search). The list is only recomputed while the panel is open.
 ### Saved settings
 
 StarExplorer remembers your session in this browser (`localStorage`, key `starexplorer:prefs:v1`):
-the applied advanced filter, frame, colour mode, scenario, sidebar toggles and class / type chips,
+the applied advanced filter, frame, colour mode, sidebar toggles and class / type chips,
 sovereignty and planet legend toggles, the quick distance filter, the camera and rotation-centre star,
 and whether the star list is open and where. Changes are saved automatically (debounced) and restored
-on the next visit. Filters and the Planets colour mode wait for the scenario data before they are
+on the next visit. Filters and the Planets colour mode wait for the active dataset before they are
 reapplied. Stars and sovereignties are stored by name, and anything invalid or no longer present is
 ignored rather than blocking start-up. **View → Clear saved data...** forgets everything and reloads
 with the defaults. Nothing is sent to the server, and if browser storage is disabled the app simply
@@ -166,7 +172,7 @@ opened; **Reset view** and **Show all** are also in the View menu.
   of Sol OR within 10 pc of Vega, even when the spheres do not overlap. Add nested groups to combine AND and OR.
 - **NOT** excludes matches to a condition or a whole group.
 - Conditions support distance from a reference star, object type, spectral class, sovereignty,
-  planetary category and confirmed planets. Planetary conditions use the active scenario even when
+  planetary category and confirmed planets. Planetary conditions use the active dataset even when
   the map is not coloured by planets; spectral, sovereignty and planet conditions match stars only
   before NOT is applied.
 
@@ -203,7 +209,7 @@ Rules are `{"match":"all"|"any","rules":[...]}` groups or single conditions:
 with distance rules is only a hint; the star name is authoritative, matched case-insensitively.
 
 Filter results are cached per object and uploaded as a GPU visibility attribute. Complex expressions
-are evaluated only when applied or when planetary scenario data changes, not during camera movement.
+are evaluated only when applied or when the active dataset changes, not during camera movement.
 Picking, labels, search, the nearest list and nebula clouds all use the same cached result.
 
 The dependency-free filter-engine tests can be run with Node.js 22+:
@@ -295,8 +301,8 @@ details panel shows a star's sovereignty in either colour mode.
 | Green | Potentially habitable: a rocky planet in the habitable zone of a suitable star |
 
 Each legend entry has a checkbox. **Confirmed planets only** restricts the map to systems marked as
-observed in the selected scenario. **Scenario** switches between published planetary populations without
-reloading the star field; **Refresh scenarios** picks up newly published revisions. The details panel summarises the system. **View system** opens a panel with stellar data,
+observed in the active dataset. The backend selects the dataset; restart it and reload the page to
+switch populations. The details panel summarises the system. **View system** opens a panel with stellar data,
 the habitable zone (conservative band in green, optimistic margins in amber), the snow line, a log-scale
 orbit diagram and a planet table. Click a planet row or dot to expand its description and moons. The
 Drag the panel's title to move it around the screen. The panel follows the selection, and Esc closes it.
@@ -313,7 +319,9 @@ Stars live in [data/stars.json](data/stars.json) (one star per line). Each entry
 | `spectral_class` | string | e.g. `G2V` |
 | `abs_mag` | number | Optional absolute visual magnitude (used for size/brightness; defaults to 5) |
 
-The file is validated when the app serves `/api/stars`. Refresh the browser after editing it.
+This JSON is an import source. The app serves the star catalogue from the active SQLite dataset.
+Editing this file alone does not change the running map; convert or update a database and activate it
+as described in [SQLite datasets](docs/DATASETS.md).
 
 The first 10 stars were entered by hand; the rest come from the
 [HYG Database v4.0](https://github.com/astronexus/HYG-Database) by David Nash, licensed
@@ -485,13 +493,12 @@ when the page loads.
 
 ## Planetary systems
 
-Every star has a system record (possibly with no planets). Baseline snapshots use real data wherever it
-exists and simulate the other systems from measured occurrence rates. The application reads frozen,
-published snapshots rather than regenerating planets during requests. Named scenarios can replace
-individual systems with manually edited planets and moons.
+Every star has a system record (possibly with no planets). The application reads a complete SQLite
+dataset rather than regenerating planets during requests. Its normalized tables make star coordinates
+and planetary properties directly queryable.
 
-See [Scenarios and snapshots](docs/SCENARIOS.md) for snapshot creation, JSON editing, publication,
-backups and production deployment.
+See [SQLite datasets](docs/DATASETS.md) for conversion, cloning, SQL queries, editing and backend
+dataset selection.
 
 **Real data**
 
@@ -552,20 +559,21 @@ See [docs/REGENERATING_SYSTEMS.md](docs/REGENERATING_SYSTEMS.md) for a step-by-s
 | 8 | Conservative HZ |
 | 16 | Habitable moon |
 | 32 | Confirmed planets |
-| 64 | Manually edited scenario system (published scenario summaries only) |
+| 64 | Manually edited system |
 
-The legacy generator commands above are useful for simulation statistics and preparing input data.
-They do not change published scenarios. Create a new baseline snapshot to capture a different seed,
-updated observations or a changed generator. Existing baselines remain frozen.
+The generator commands above are useful for simulation statistics and preparing input data. They do
+not mutate the active database. Clone the active dataset before experimenting, then select that file
+in the backend configuration. See [SQLite datasets](docs/DATASETS.md).
 
 **Endpoints**
 
-- `/api/scenarios`: published scenarios, revisions and catalogue metadata.
-- `/api/systems-summary?scenario=<id>&revision=<revision>`: the compact, gzipped scenario summary.
-- `/api/system/<star name>?scenario=<id>&revision=<revision>`: one frozen system with planets and moons.
+- `/api/stars`: the selected database's full star catalogue and coordinate frame.
+- `/api/systems-summary`: compact planet counts and system flags.
+- `/api/system/<star name>`: one system with planets and moons, reconstructed from normalized rows.
 
-Omitting the query selects the configured default scenario. Browser requests always pin an explicit
-scenario and revision. Missing published data is an actionable error, not a request-time regeneration.
+There is no browser-side dataset selector. The backend's `STAREXPLORER_DATABASE` setting chooses the
+database for all clients. Missing or invalid databases produce an explicit error, not request-time
+regeneration.
 
 **Limitations**
 

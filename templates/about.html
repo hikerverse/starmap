@@ -22,7 +22,7 @@
       <a href="#capabilities">What it can do</a>
       <a href="#data">Astronomical databases</a>
       <a href="#statistics">Statistical modelling</a>
-      <a href="#snapshots">Snapshots &amp; scenarios</a>
+      <a href="#snapshots">SQLite datasets</a>
       <a href="#limits">Limits &amp; interpretation</a>
       <a href="#references">Sources &amp; references</a>
     </nav>
@@ -41,7 +41,7 @@
         <li>Filter by distance, object type, spectral class, sovereignty or planetary category.
           Combine nested ALL, ANY and NOT rules and save or share filter text.</li>
         <li>Inspect planetary systems, orbit diagrams, stellar properties, habitable zones, planet
-          descriptions and moons. Switch published scenarios to explore alternative populations.</li>
+          descriptions and moons. The backend selects a complete SQLite dataset.</li>
         <li>Colour stars by their spectral colours, planetary categories or fictional sovereignties.
           Add an optional seeded volumetric subspace-disturbance layer.</li>
       </ul>
@@ -122,21 +122,16 @@
     </section>
 
     <section id="snapshots">
-      <h2>Why there are databases and published scenarios</h2>
-      <p>Generation happens offline. A baseline freezes the full planetary population, including
-        empty systems and moon lists, into an indexed SQLite database. Metadata records the seed,
-        generator version, source hashes and catalogue fingerprint. The web app reads these
-        published databases without regenerating planets during requests.</p>
-      <p>A named scenario pins a baseline and can replace selected systems with explicitly authored
-        planets and moons. Publishing validates replacements, recalculates derived properties and
-        creates an immutable revision. Unchanged systems inherit their baseline. Manually altered
-        physical properties and newly authored bodies carry manual provenance rather than
-        silently becoming confirmed observations.</p>
-      <p>The browser first receives compact planet counts and category flags in catalogue order,
-        then requests detailed systems as needed. This keeps the initial map smaller than sending
-        every planetary system and moon. Revision identifiers and catalogue fingerprints help
-        prevent mixing incompatible data. SQLite snapshots must be deployed and backed up
-        separately from the editable JSON; they are excluded from Git.</p>
+      <h2>Complete, queryable SQLite datasets</h2>
+      <p>Each dataset is a standalone SQLite database containing the star catalogue, stellar system
+        properties, and normalized planet, moon and host rows. Star coordinates and physical body
+        properties are stored in columns, with indexes for spatial searches. This makes database
+        queries—such as distances between stars—possible without parsing nested JSON.</p>
+      <p>To make an alternate dataset, clone a database file and select it in the backend
+        configuration. The browser has no dataset selector. The app opens the active file read-only,
+        returns compact planet summaries and requests detailed systems as needed. Direct SQL edits
+        are supported; refresh stored flags after planetary changes. Dataset files are excluded from
+        Git and should be backed up separately.</p>
     </section>
 
     <section id="limits">
@@ -144,7 +139,7 @@
       <ul>
         <li><b>Observed, simulated and manual are different.</b> A confirmed planet may still have
           estimated parameters and simulated moons. A generated planet is a model outcome.
-          A manual scenario system is authored content. Check provenance and source notes.</li>
+          A manually edited system is authored content. Check provenance and source notes.</li>
         <li><b>Potentially habitable does not mean inhabited.</b> The flag uses simplified
           size/mass, stellar and habitable-zone criteria. Equilibrium temperature is not surface
           temperature; atmospheres, climate, water and biology are not established by this model.</li>
@@ -188,7 +183,7 @@
           Domingos et al. (2006), and Barnes &amp; O'Brien (2002): moon-model constraints.</li>
       </ul>
       <p>Published research informs the implementation; inclusion here does not imply endorsement.
-        The installed datasets and published scenario revisions determine which observations and
+        The active dataset determines which observations and
         generated worlds this instance serves.</p>
     </section>
     {% if not about_embedded %}

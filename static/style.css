@@ -166,11 +166,12 @@ body.about-page { height: auto; min-height: 100%; overflow: auto; background: #0
 .toolbar .buttons { display: flex; gap: 6px; }
 .toolbar .buttons button { flex: 1; }
 .distance-row, .frame-row { display: flex; align-items: center; gap: 6px; }
-#frame-select, #colour-mode, #scenario-select {
+#frame-select, #colour-mode {
   flex: 1; background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px;
   padding: 3px 6px; font: inherit;
 }
-#scenario-select { min-width: 0; }
+#dataset-status { font-size: 11px; overflow-wrap: anywhere; }
+#dataset-status.error { color: #ffb3b3; }
 #sovereignty-legend { display: flex; flex-direction: column; gap: 4px; padding-left: 4px; }
 #sovereignty-legend[hidden] { display: none; }
 #sovereignty-list { list-style: none; margin: 0; padding: 0; max-height: 160px; overflow-y: auto; }
@@ -187,9 +188,6 @@ body.about-page { height: auto; min-height: 100%; overflow: auto; background: #0
   padding: 3px 6px; font: inherit;
 }
 #distance-status { font-size: 11px; opacity: 0.6; }
-#scenario-status { font-size: 11px; overflow-wrap: anywhere; }
-#scenario-status.error { color: #ffb3b3; }
-#reload-scenarios { margin-bottom: 4px; font-size: 11px; }
 #class-filter, #nebula-filter { display: flex; flex-wrap: wrap; gap: 3px; padding-left: 20px; }
 .class-chip {
   padding: 1px 6px; min-width: 22px; font-size: 11px; border-radius: 10px;
@@ -465,7 +463,7 @@ kbd {
   .desktop-hints { display: none; }
   .touch-hints { display: block; }
   #star-search, #distance-filter, #filter-dialog input:not([type="checkbox"]), #filter-dialog select,
-  #frame-select, #colour-mode, #scenario-select, #subspace-seed { font-size: 16px; }
+  #frame-select, #colour-mode, #subspace-seed { font-size: 16px; }
 }
 
 @media (max-width: 1024px) {
