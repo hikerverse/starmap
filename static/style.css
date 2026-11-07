@@ -9,6 +9,21 @@ html, body {
 
 #canvas-container { position: fixed; inset: 0; }
 #canvas-container canvas { display: block; touch-action: none; }
+
+#loading-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: #000; color: #dde6ff; font-size: 14px;
+  transition: opacity 0.35s ease;
+}
+#loading-overlay.fade-out { opacity: 0; pointer-events: none; }
+.loading-spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid #3b4f8f; border-top-color: #dde6ff;
+  animation: loading-spin 0.9s linear infinite;
+}
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+
 #toggle-controls, #close-controls, .touch-hints { display: none; }
 .sidebar-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 #focus-selected { margin-bottom: 8px; }

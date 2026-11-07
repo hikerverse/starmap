@@ -570,6 +570,10 @@ in the backend configuration. See [SQLite datasets](docs/DATASETS.md).
 - `/api/stars`: the selected database's full star catalogue and coordinate frame.
 - `/api/systems-summary`: compact planet counts and system flags.
 - `/api/system/<star name>`: one system with planets and moons, reconstructed from normalized rows.
+- `/api/query/stars/within`: stars within a radius of an arbitrary coordinate.
+- `/api/query/stars/nearest`: nearest stars to an arbitrary coordinate.
+- `/api/query/stars/<name>/within`: stars within a radius of a named star.
+- `/api/query/distance`: exact distance between two named stars or stable IDs.
 
 There is no browser-side dataset selector. The backend's `STAREXPLORER_DATABASE` setting chooses the
 database for all clients. Missing or invalid databases produce an explicit error, not request-time

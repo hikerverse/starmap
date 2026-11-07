@@ -1962,6 +1962,18 @@ async function init() {
   restorePrefs();
   renderList();
   loadDataset();
+  // Saved state that needs the planets dataset keeps the overlay up until loadDataset settles
+  if (!pendingFilterText && !pendingColourMode) finishLoading();
+}
+
+// ---------- Loading overlay ----------
+const loadingOverlay = document.getElementById('loading-overlay');
+
+// Fades out the start-up overlay once the saved view has been fully applied; safe to call repeatedly
+function finishLoading() {
+  if (loadingOverlay.classList.contains('fade-out')) return;
+  loadingOverlay.classList.add('fade-out');
+  setTimeout(() => loadingOverlay.remove(), 400);
 }
 
 // ---------- Saved settings (localStorage) ----------
@@ -2231,6 +2243,7 @@ async function loadDataset() {
     pendingColourMode = null;
     applyColourState();
     applyPendingFilter();
+    finishLoading();
     if (selected >= 0) updatePlanetRow(selected);
     if (systemIndex >= 0) showSystem(systemIndex);
   } catch (err) {
@@ -2241,6 +2254,7 @@ async function loadDataset() {
 
 function finishDatasetError(err) {
   datasetLoading = false;
+  finishLoading();
   console.error('Active dataset loading failed:', err);
   setDatasetStatus(`Could not load active dataset: ${err.message}. Check the backend database setting.`, true);
   if (!activeDataset) {
@@ -2683,5 +2697,6 @@ function loop(now) {
 init().catch((err) => {
   console.error(err);
   document.getElementById('centre-info').textContent = `Error: ${err.message}`;
+  finishLoading();
 });
 requestAnimationFrame(loop);

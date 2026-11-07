@@ -100,6 +100,43 @@ WHERE p.mass_mearth >= 1
 ORDER BY p.mass_mearth DESC;
 ```
 
+## HTTP query API
+
+The read-only query controller is mounted below `/api/query`. Coordinate arguments use the active
+dataset's Cartesian coordinate frame and parsecs. Responses include `dataset_id`, `units`, and `frame`.
+Result lists include each star's exact Euclidean `distance_pc` from the requested centre.
+
+Find stars in a spherical radius. Results are ordered by distance then name; `limit` defaults to 100
+and is capped at 1,000, while `offset` supports pagination:
+
+```text
+GET /api/query/stars/within?x=0&y=0&z=0&radius_pc=10&limit=100&offset=0
+```
+
+Find the nearest stars to an arbitrary point. `limit` defaults to 25; `max_radius_pc` is optional and,
+when supplied, limits the search to that radius:
+
+```text
+GET /api/query/stars/nearest?x=0&y=0&z=0&limit=25&max_radius_pc=10
+```
+
+Use a named star or stable star ID as the centre:
+
+```text
+GET /api/query/stars/Alpha%20Centauri%20A/within?radius_pc=5
+```
+
+Get the separation between two named stars or stable IDs:
+
+```text
+GET /api/query/distance?from=Sol&to=Alpha%20Centauri%20A
+```
+
+Invalid, non-finite or out-of-range query values return `400`; unknown stars return `404`.
+Unbounded `nearest` scans the star catalogue, so prefer a `max_radius_pc` when an approximate search
+boundary is known. Radius searches use the R-Tree to narrow the candidate set before calculating exact
+distances.
+
 ## Editing a clone
 
 Use any SQLite editor or script to change rows in a cloned database. Enable foreign-key checks in your

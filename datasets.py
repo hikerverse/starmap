@@ -286,20 +286,113 @@ class DatasetStore:
         db.execute("PRAGMA foreign_keys=ON")
         return db
 
+    def _star_from_row(self, row):
+        name, x, y, z, colour, spectral_class, abs_mag, abs_mag_present, extra, distance = row
+        star = json.loads(extra)
+        star.update(name=name, x=x, y=y, z=z, colour=colour, spectral_class=spectral_class)
+        if abs_mag_present:
+            star["abs_mag"] = abs_mag
+        else:
+            star.pop("abs_mag", None)
+        if distance is not None:
+            star["distance_pc"] = distance
+        return star
+
+    def _query_star_from_row(self, row):
+        identifier, *fields = row
+        star = self._star_from_row(fields)
+        star["id"] = identifier
+        return star
+
+    def _star_select(self):
+        return """SELECT s.id,s.name,s.x,s.y,s.z,s.colour,s.spectral_class,s.abs_mag,
+                         s.abs_mag_present,s.extra"""
+
+    def star_position(self, name):
+        with closing(self.connect()) as db:
+            row = db.execute(
+                "SELECT id,name,x,y,z FROM stars WHERE name=? OR id=?", (name, name)
+            ).fetchone()
+        if row is None:
+            raise DatasetNotFound(f"No star named or identified as '{name}'.")
+        return dict(zip(("id", "name", "x", "y", "z"), row))
+
+    def _query_meta(self):
+        return {"dataset_id": self.meta["dataset_id"], "units": self.meta["units"],
+                "frame": self.meta["frame"]}
+
+    def stars_within(self, x, y, z, radius, limit=100, offset=0):
+        predicate = """r.x_min <= ? AND r.x_max >= ? AND
+                       r.y_min <= ? AND r.y_max >= ? AND
+                       r.z_min <= ? AND r.z_max >= ?"""
+        params = (x + radius, x - radius, y + radius, y - radius, z + radius, z - radius)
+        distance = "sqrt((s.x-?)*(s.x-?)+(s.y-?)*(s.y-?)+(s.z-?)*(s.z-?))"
+        with closing(self.connect()) as db:
+            count = db.execute(
+                f"""SELECT count(*) FROM star_positions r JOIN stars s ON s.rowid=r.star_rowid
+                    WHERE {predicate} AND {distance} <= ?""",
+                params + (x, x, y, y, z, z, radius),
+            ).fetchone()[0]
+            rows = db.execute(
+                f"""{self._star_select()}, {distance} AS distance_pc
+                    FROM star_positions r JOIN stars s ON s.rowid=r.star_rowid
+                    WHERE {predicate} AND {distance} <= ?
+                    ORDER BY distance_pc,s.name LIMIT ? OFFSET ?""",
+                (x, x, y, y, z, z) + params + (x, x, y, y, z, z, radius, limit, offset),
+            )
+            stars = [self._query_star_from_row(row) for row in rows]
+        return dict(self._query_meta(), center={"x": x, "y": y, "z": z},
+                    radius_pc=radius, total=count, limit=limit, offset=offset, stars=stars)
+
+    def nearest_stars(self, x, y, z, limit=25, max_radius=None):
+        if max_radius is None:
+            where = ""
+            params = ()
+        else:
+            where = """WHERE r.x_min <= ? AND r.x_max >= ? AND
+                              r.y_min <= ? AND r.y_max >= ? AND
+                              r.z_min <= ? AND r.z_max >= ? AND
+                              sqrt((s.x-?)*(s.x-?)+(s.y-?)*(s.y-?)+(s.z-?)*(s.z-?)) <= ?"""
+            params = (x + max_radius, x - max_radius, y + max_radius, y - max_radius,
+                      z + max_radius, z - max_radius, x, x, y, y, z, z, max_radius)
+        distance = "sqrt((s.x-?)*(s.x-?)+(s.y-?)*(s.y-?)+(s.z-?)*(s.z-?))"
+        with closing(self.connect()) as db:
+            rows = db.execute(
+                f"""{self._star_select()}, {distance} AS distance_pc
+                    FROM star_positions r JOIN stars s ON s.rowid=r.star_rowid
+                    {where} ORDER BY distance_pc,s.name LIMIT ?""",
+                (x, x, y, y, z, z) + params + (limit,),
+            )
+            stars = [self._query_star_from_row(row) for row in rows]
+        return dict(self._query_meta(), center={"x": x, "y": y, "z": z},
+                    max_radius_pc=max_radius, limit=limit, stars=stars)
+
+    def distance_between(self, first, second):
+        with closing(self.connect()) as db:
+            def find(value):
+                row = db.execute(
+                    """SELECT id,name,x,y,z,colour,spectral_class,abs_mag,abs_mag_present,extra
+                       FROM stars WHERE name=? OR id=?""", (value, value)
+                ).fetchone()
+                if row is None:
+                    raise DatasetNotFound(f"No star named or identified as '{value}'.")
+                identifier, *fields = row
+                star = self._star_from_row((*fields, None))
+                star["id"] = identifier
+                return star
+
+            left, right = find(first), find(second)
+        distance = ((left["x"] - right["x"]) ** 2 + (left["y"] - right["y"]) ** 2
+                    + (left["z"] - right["z"]) ** 2) ** 0.5
+        return dict(self._query_meta(), distance_pc=distance, stars=[left, right])
+
     def catalogue(self):
         with closing(self.connect()) as db:
             stars = []
             for row in db.execute(
                 "SELECT name,x,y,z,colour,spectral_class,abs_mag,abs_mag_present,extra FROM stars ORDER BY ordinal"
             ):
-                name, x, y, z, colour, spectral_class, abs_mag, abs_mag_present, extra = row
-                star = json.loads(extra)
-                star.update(name=name, x=x, y=y, z=z, colour=colour, spectral_class=spectral_class)
-                if abs_mag_present:
-                    star["abs_mag"] = abs_mag
-                else:
-                    star.pop("abs_mag", None)
-                stars.append(star)
+                stars.append(self._star_from_row((*row, None)))
         return {
             "units": self.meta["units"],
             "frame": self.meta["frame"],

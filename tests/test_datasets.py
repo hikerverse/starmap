@@ -4,8 +4,12 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 
 import datasets as D
+import app as application
+from flask import Flask
+from query_api import create_query_blueprint
 import scenarios as C
 
 
@@ -105,6 +109,50 @@ class DatasetTests(unittest.TestCase):
         self.store.refresh()
         summary = D.DatasetStore(self.database).summary()
         self.assertTrue(summary["flags"][0] & C.FLAG_MANUAL)
+
+    def test_spatial_query_api(self):
+        app = Flask(__name__)
+        app.register_blueprint(create_query_blueprint(lambda: self.store))
+        client = app.test_client()
+
+        within = client.get("/api/query/stars/within?x=0&y=0&z=0&radius_pc=2")
+        self.assertEqual(within.status_code, 200)
+        self.assertEqual(within.json["units"], "parsec")
+        self.assertEqual([star["name"] for star in within.json["stars"]], ["Sol"])
+        self.assertEqual(within.json["total"], 1)
+
+        boundary = client.get(
+            "/api/query/stars/within?x=1&y=2&z=2&radius_pc=1&limit=1&offset=0"
+        )
+        self.assertEqual([star["name"] for star in boundary.json["stars"]], ["Nearby"])
+
+        nearest = client.get("/api/query/stars/nearest?x=0&y=0&z=0&limit=2")
+        self.assertEqual(nearest.status_code, 200)
+        self.assertEqual(nearest.json["stars"][0]["name"], "Sol")
+        self.assertIn("id", nearest.json["stars"][0])
+
+        named = client.get("/api/query/stars/Nearby/within?radius_pc=4")
+        self.assertEqual(named.status_code, 200)
+        self.assertEqual(named.json["center"]["name"], "Nearby")
+        self.assertEqual(named.json["total"], 2)
+
+        distance = client.get("/api/query/distance?from=%20Sol%20&to=Nearby")
+        self.assertEqual(distance.status_code, 200)
+        self.assertAlmostEqual(distance.json["distance_pc"], 14 ** 0.5)
+        self.assertEqual(client.get("/api/query/distance?from=Sol&to=Missing").status_code, 404)
+        self.assertEqual(client.get("/api/query/stars/within?x=bad&y=0&z=0&radius_pc=2").status_code, 400)
+        self.assertEqual(client.get("/api/query/stars/within?x=0&y=0&z=0&radius_pc=NaN").status_code, 400)
+        self.assertEqual(client.get("/api/query/stars/nearest?x=0&y=0&z=0&limit=1001").status_code, 400)
+
+    def test_spatial_query_api_is_registered_on_application(self):
+        application._systems_state.clear()
+        with patch.object(application, "DATASET_FILE", self.database):
+            response = application.app.test_client().get(
+                "/api/query/stars/within?x=0&y=0&z=0&radius_pc=2"
+            )
+        application._systems_state.clear()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([star["name"] for star in response.json["stars"]], ["Sol"])
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Flask, Response, abort, render_template, request
 
 import datasets
+from query_api import create_query_blueprint
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -225,6 +226,9 @@ def systems_state() -> dict:
             _systems_state.clear()
             _systems_state.update(key=key, store=datasets.DatasetStore(DATASET_FILE), stat=stat)
         return dict(_systems_state)
+
+
+app.register_blueprint(create_query_blueprint(lambda: systems_state()["store"]))
 
 
 def gzip_response(raw: bytes, compressed: bytes) -> Response:
