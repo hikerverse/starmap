@@ -6,6 +6,7 @@ import { clearPrefs, loadPrefs, savePrefs, storageAvailable } from './prefs.js';
 import { createSubspace } from './subspace.js';
 import { disturbanceAt, SUBSPACE_RADIUS_PC } from './subspace-field.js';
 import { createMilkyWay } from './milky-way.js';
+import { createShapeEditor } from './shape-editor.js';
 
 // ---------- Tunables ----------
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
@@ -262,6 +263,11 @@ let selected = -1;
 let centre = -1;
 
 const starPos = (i, target = new THREE.Vector3()) => target.set(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]);
+const shapeEditor = createShapeEditor({
+  scene, camera, labelLayer, eqToGal: EQ_TO_GAL, galToEq: GAL_TO_EQ,
+  getObjects: () => records, getSelected: () => selected >= 0 ? records[selected] : null,
+  onChange: () => persist(),
+});
 // Distance filter: only show objects within filterRadius pc of the anchor star (0 = off).
 // Extragalactic objects are a backdrop and are never hidden by it.
 let filterRadius = 0;
@@ -1855,11 +1861,14 @@ searchEl.addEventListener('input', () => {
 });
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  const shapeDialog = document.getElementById('shape-dialog');
+  if (shapeDialog.open && shapeDialog.contains(document.activeElement)) { e.preventDefault(); shapeDialog.close(); return; }
   if (aboutDialog.open && aboutDialog.contains(document.activeElement)) { e.preventDefault(); aboutDialog.close(); return; }
   if (guideDialog.open && guideDialog.contains(document.activeElement)) { e.preventDefault(); guideDialog.close(); return; }
   const filterDialog = document.getElementById('filter-dialog');
   if (filterDialog.open) { filterDialog.close(); return; }
   if (subspaceDialog.open) { e.preventDefault(); subspaceDialog.close(); return; }
+  if (shapeDialog.open) { e.preventDefault(); shapeDialog.close(); return; }
   const openMenu = topMenus.find((menu) => menu.open);
   if (openMenu) { openMenu.open = false; return; }
   if (compactLayout.matches && sidebar.classList.contains('controls-open')) {
@@ -2013,6 +2022,7 @@ function savedState() {
     starPanel: { open: !starPanel.classList.contains('hidden'), ...panel },
     guide: guideState(),
     subspace: subspace.settings,
+    shapes: shapeEditor.shapes,
   };
 }
 
@@ -2046,6 +2056,7 @@ function restorePrefs() {
   const prefs = loadPrefs();
   restoring = true;
   try {
+    if (prefs.shapes !== undefined) shapeEditor.restore(prefs.shapes);
     if (prefs.subspace) {
       try {
         subspace.configure(prefs.subspace);
@@ -2127,7 +2138,7 @@ clearButton.disabled = !storageAvailable;
 if (!storageAvailable) clearButton.title = 'Browser storage is unavailable, so settings are not being saved';
 clearButton.addEventListener('click', () => {
   document.getElementById('view-menu').open = false;
-  if (!window.confirm('Clear all saved StarExplorer settings (filters, view, panels and toggles) and reload with defaults?')) return;
+  if (!window.confirm('Clear all saved StarExplorer settings (shapes, filters, view, panels and toggles) and reload with defaults?')) return;
   clearPrefs();
   window.location.reload();
 });
@@ -2603,6 +2614,7 @@ function setFrame(newFrame) {
   if (newFrame === frame || !N) return;
   const m = newFrame === 'galactic' ? EQ_TO_GAL : GAL_TO_EQ;
   frame = newFrame;
+  shapeEditor.setFrame(frame);
   const v = new THREE.Vector3();
   for (let i = 0; i < N; i++) {
     v.fromArray(pos, 3 * i).applyMatrix3(m).toArray(pos, 3 * i);
@@ -2694,6 +2706,7 @@ function loop(now) {
   controls.update();
   updateGrid();
   updateLabels();
+  shapeEditor.updateLabels();
   updateCameraInfo();
   updateOrientation();
   if (frame === 'galactic') displayToGalactic.identity();

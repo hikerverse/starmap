@@ -229,6 +229,32 @@ body.about-page { height: auto; min-height: 100%; overflow: auto; background: #0
 #subspace-controls p { font-size: 11px; line-height: 1.4; }
 #subspace-error { color: #ffb3b3; }
 #subspace-error:empty { display: none; }
+#shape-dialog {
+  position: fixed; top: 56px; left: 280px; right: auto; margin: 0; z-index: 11;
+  box-sizing: border-box; width: min(460px, calc(100vw - 16px)); max-height: calc(100dvh - 72px);
+  max-width: calc(100vw - 16px); min-width: min(280px, calc(100vw - 16px));
+  overflow: auto; resize: both; padding: 14px; color: #dde6ff; background: #0a1020;
+  border: 1px solid #3b4f8f; border-radius: 8px; font-size: 13px;
+}
+#shape-title { flex: 1; margin: 0; font-size: 17px; cursor: grab; touch-action: none; user-select: none; }
+#shape-title.dragging { cursor: grabbing; }
+#shape-dialog label { display: block; margin: 6px 0; }
+#shape-dialog input:not([type="checkbox"]), #shape-dialog select {
+  box-sizing: border-box; width: 100%; min-width: 0; margin-top: 4px; padding: 6px;
+  background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f; border-radius: 4px; font: inherit;
+}
+#shape-dialog input[type="color"] { height: 34px; padding: 2px; }
+#shape-dialog fieldset { min-width: 0; margin: 10px 0; border: 1px solid #3b4f8f; border-radius: 6px; }
+.shape-fields { display: flex; flex-wrap: wrap; gap: 8px; }
+.shape-fields > label { flex: 1; min-width: 80px; }
+.shape-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+#shape-help, #shape-dialog small { font-size: 12px; color: #aebbdc; }
+#shape-error { color: #ffb3b3; }
+#shape-error:empty, #shape-status:empty { display: none; }
+@media (max-width: 1024px) {
+  #shape-dialog { left: 8px; }
+  #shape-dialog input:not([type="checkbox"]), #shape-dialog select { font-size: 16px; }
+}
 #subspace-selected, #subspace-camera { color: #a7d8ff; font-size: 12px; }
 button {
   background: #22305a; color: #dde6ff; border: 1px solid #3b4f8f;

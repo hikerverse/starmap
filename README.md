@@ -119,6 +119,29 @@ Run the dependency-free field regression tests with Node.js 22+:
 node --experimental-default-type=module tests\test_subspace.mjs
 ```
 
+### Primitive shapes
+
+Open **View → Primitive shapes...** for a draggable, resizable, non-blocking annotation window.
+Add spheres/ellipsoids, boxes, cylinders, cones, rings/toruses or XY planes. Set full X/Y/Z dimensions
+in parsecs (diameters for spheres), colour, transparency from 0% opaque to 100% invisible,
+wireframe, rotation and an optional label. Planes ignore Z height.
+
+Centres and rotations use **Galactic coordinates**, in parsecs from Sol, even in Equatorial view.
+Enter coordinates directly, choose an exact catalogue object name, or select an object on the map
+or star list and press **Use selected object**. These buttons copy a fixed centre; later object
+selections do not move the annotation. Press **Add shape** or **Save changes** to apply.
+
+Choose a saved shape to edit it or use **Delete shape**. Close or Escape dismisses the window
+without removing shapes. Annotations stay aligned across frame changes, are independent of catalogue
+filters and do not intercept object picking. The **Labels** toggle also hides annotation labels.
+Shapes are saved automatically in this browser; **Clear saved data...** removes them too.
+
+Run the dependency-free validation tests with Node.js 22+:
+
+```powershell
+node --experimental-default-type=module tests\test_primitive_shapes.mjs
+```
+
 ### Navigation
 
 On tablets and phones (up to 1024 px wide), **Controls** opens a collapsible display-controls panel.

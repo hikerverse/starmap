@@ -30,10 +30,11 @@
         <button id="open-star-list" aria-pressed="false" aria-controls="star-panel" title="Show or hide the star search and list">Star list</button>
         <button id="open-filters" disabled>Filters...</button>
         <button id="open-subspace" type="button" aria-controls="subspace-dialog" aria-expanded="false">Subspace disturbance...</button>
+        <button id="open-shapes" type="button" aria-controls="shape-dialog" aria-expanded="false">Primitive shapes...</button>
         <button id="reset-view" title="Centre on Sol">Reset view</button>
         <button id="show-all" title="Zoom out to fit every star">Show all</button>
         <hr>
-        <button id="clear-saved-data" title="Forget saved filters, view, panels and toggles in this browser and reload with defaults">Clear saved data...</button>
+        <button id="clear-saved-data" title="Forget saved shapes, filters, view, panels and toggles in this browser and reload with defaults">Clear saved data...</button>
       </div>
     </details>
     <details id="help-menu">
@@ -94,6 +95,75 @@
       <p>Illustrative field within 1,200 pc of Sol. Glow shows accumulated disturbance, not local strength.</p>
     </fieldset>
     <p id="subspace-error" role="alert"></p>
+  </dialog>
+
+  <dialog id="shape-dialog" aria-labelledby="shape-title" aria-describedby="shape-help">
+    <div class="filter-heading">
+      <h2 id="shape-title" title="Drag to move this panel">Primitive shapes</h2>
+      <button id="close-shapes" type="button">Close</button>
+    </div>
+    <p id="shape-help">Annotation shapes, independent of object filters. Drag the title to move this window.
+      Coordinates and dimensions are Galactic, in parsecs from Sol, even in Equatorial view.</p>
+    <label for="shape-list">Saved shapes</label>
+    <select id="shape-list"><option value="">New shape</option></select>
+    <form id="shape-form">
+      <div class="shape-fields">
+        <label>Primitive <select id="shape-kind">
+          <option value="sphere">Sphere / ellipsoid</option>
+          <option value="box">Box</option>
+          <option value="cylinder">Cylinder</option>
+          <option value="cone">Cone</option>
+          <option value="torus">Ring / torus</option>
+          <option value="plane">Plane (XY)</option>
+        </select></label>
+        <label>Label <input id="shape-label" type="text" maxlength="120" placeholder="Optional label"></label>
+      </div>
+      <fieldset>
+        <legend>Full dimensions (pc, before rotation)</legend>
+        <div class="shape-fields">
+          <label>X width <input id="shape-size-x" type="number" min="0.000001" step="any" value="2" required></label>
+          <label>Y depth <input id="shape-size-y" type="number" min="0.000001" step="any" value="2" required></label>
+          <label>Z height <input id="shape-size-z" type="number" min="0.000001" step="any" value="2" required></label>
+        </div>
+        <small>A sphere uses diameters; unequal sizes make an ellipsoid. A plane ignores Z height.</small>
+      </fieldset>
+      <fieldset>
+        <legend>Centre (Galactic pc)</legend>
+        <div class="shape-fields">
+          <label>X <input id="shape-x" type="number" step="any" value="0" required></label>
+          <label>Y <input id="shape-y" type="number" step="any" value="0" required></label>
+          <label>Z <input id="shape-z" type="number" step="any" value="0" required></label>
+        </div>
+        <label>Object name <input id="shape-object" type="text" list="shape-object-options" autocomplete="off" placeholder="Search catalogue objects"></label>
+        <datalist id="shape-object-options"></datalist>
+        <div class="shape-actions">
+          <button id="shape-use-object" type="button">Use named object</button>
+          <button id="shape-use-selected" type="button">Use selected object</button>
+        </div>
+        <small>Copies the object's centre; selecting another object will not move the shape.</small>
+      </fieldset>
+      <fieldset>
+        <legend>Rotation (degrees about Galactic axes)</legend>
+        <div class="shape-fields">
+          <label>X <input id="shape-rotation-x" type="number" step="any" value="0" required></label>
+          <label>Y <input id="shape-rotation-y" type="number" step="any" value="0" required></label>
+          <label>Z <input id="shape-rotation-z" type="number" step="any" value="0" required></label>
+        </div>
+      </fieldset>
+      <div class="shape-fields">
+        <label>Colour <input id="shape-colour" type="color" value="#55aaff"></label>
+        <label>Transparency <output id="shape-transparency-value">50%</output>
+          <input id="shape-transparency" type="range" min="0" max="100" step="1" value="50"></label>
+      </div>
+      <label><input id="shape-wireframe" type="checkbox"> Wireframe</label>
+      <p id="shape-error" role="alert"></p>
+      <div class="shape-actions">
+        <button id="shape-new" type="button">New shape</button>
+        <button id="shape-delete" type="button" disabled>Delete shape</button>
+        <button id="shape-save" type="submit">Add shape</button>
+      </div>
+      <p id="shape-status" role="status" aria-live="polite"></p>
+    </form>
   </dialog>
 
   <div id="sidebar" class="panel">
@@ -319,6 +389,12 @@
               version reproduce it. <b>Glow</b> changes appearance only. Cloud brightness accumulates along the
               line of sight; <b>Local disturbance</b> gives strength at the camera or selected object.
               Settings are saved in this browser.</dd>
+            <dt>Primitive shapes</dt><dd>Open <b>View &rarr; Primitive shapes...</b> to add labelled spheres, boxes,
+              cylinders, cones, rings or planes. Set full dimensions, colour, transparency and rotation.
+              Enter Galactic coordinates in parsecs, or copy the centre of a named or selected object.
+              Choose a saved shape to edit or delete it. Drag the title to move the window; Close or Escape
+              leaves shapes on the map. Shapes are saved in this browser, stay aligned across frame changes,
+              and are independent of catalogue filters. The Labels toggle also controls shape labels.</dd>
           </dl>
         </section>
 
@@ -361,7 +437,7 @@
 
         <section id="guide-saved">
           <h3><span class="guide-icon">&#128190;</span> Saved settings</h3>
-          <p>Your view, toggles, filters and open panels are saved automatically in this browser and restored next time.
+          <p>Your shapes, view, toggles, filters and open panels are saved automatically in this browser and restored next time.
             Nothing is sent to the server. Use <em>View &rarr; Clear saved data&hellip;</em> to start again from the defaults.</p>
         </section>
 
