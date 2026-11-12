@@ -78,6 +78,36 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(actual["planets"], expected["planets"])
         self.assertEqual(actual["star"], expected["star"])
 
+    def test_catalogue_appends_distance_limited_gaia_stars_without_system_rows(self):
+        with closing(sqlite3.connect(self.database)) as db:
+            db.execute("""
+                CREATE TABLE gaia_stars (
+                    source_id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL,
+                    x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL,
+                    colour TEXT NOT NULL, spectral_class TEXT NOT NULL,
+                    abs_mag REAL NOT NULL, extra TEXT NOT NULL, distance_pc REAL NOT NULL
+                )
+            """)
+            db.executemany(
+                "INSERT INTO gaia_stars VALUES (?,?,?,?,?,?,?,?,?,?)",
+                [
+                    ("gaia-near", "Gaia DR3 1", 1500, 0, 0, "#ffffff", "Other",
+                     5.0, '{"distance_pc":1500}', 1500),
+                    ("gaia-far", "Gaia DR3 2", 3000, 0, 0, "#ffffff", "Other",
+                     7.0, '{"distance_pc":3000}', 3000),
+                ],
+            )
+            db.commit()
+        catalogue = self.store.catalogue(2000)
+        self.assertEqual([star["name"] for star in catalogue["stars"]],
+                         ["Sol", "Nearby", "Gaia DR3 1"])
+        self.assertEqual(catalogue["system_star_count"], 2)
+        self.assertEqual(catalogue["gaia_star_count"], 1)
+        self.assertEqual(catalogue["load_radius_pc"], 2000)
+        self.assertEqual(catalogue["catalogue_fingerprint"],
+                         self.store.catalogue()["catalogue_fingerprint"])
+        self.assertEqual(len(self.store.summary()["planets"]), 2)
+
     def test_create_builds_a_standalone_dataset_without_legacy_snapshot(self):
         created = self.root / "created.sqlite"
         D.create_dataset(self.root, created, "Generated", seed=1)
@@ -86,6 +116,61 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(store.meta["seed"], 1)
         self.assertEqual(store.catalogue()["stars"], self.store.catalogue()["stars"])
         self.assertEqual(store.system("Sol")["planets"], self.store.system("Sol")["planets"])
+
+    def test_radius_remains_selectable_without_gaia_additions(self):
+        catalogue = self.store.catalogue(5000)
+        self.assertEqual(catalogue["load_radius_pc"], 5000)
+        self.assertFalse(catalogue["gaia_available"])
+        self.assertEqual(catalogue["gaia_star_count"], 0)
+
+    def test_catalogue_source_and_radius_keep_summary_aligned(self):
+        with closing(sqlite3.connect(self.database)) as db:
+            db.execute("UPDATE stars SET x=1500,y=0,z=0 WHERE name='Sol'")
+            db.execute("""
+                CREATE TABLE gaia_stars (
+                    source_id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL,
+                    x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL,
+                    colour TEXT NOT NULL, spectral_class TEXT NOT NULL,
+                    abs_mag REAL NOT NULL, extra TEXT NOT NULL, distance_pc REAL NOT NULL
+                )
+            """)
+            db.executemany("INSERT INTO gaia_stars VALUES (?,?,?,?,?,?,?,?,?,?)", [
+                ("1", "Gaia DR3 1", 1000, 0, 0, "#ffffff", "Other", 5, "{}", 1000),
+                ("2", "Gaia DR3 2", 2001, 0, 0, "#ffffff", "Other", 5, "{}", 2001),
+            ])
+            db.commit()
+        expectations = {
+            (1000, "both"): (["Nearby", "Gaia DR3 1"], [0]),
+            (2000, "hyg"): (["Sol", "Nearby"], [8, 0]),
+            (2000, "gaia"): (["Gaia DR3 1"], []),
+            (5000, "both"): (["Sol", "Nearby", "Gaia DR3 1", "Gaia DR3 2"], [8, 0]),
+        }
+        for (radius, source), (names, counts) in expectations.items():
+            with self.subTest(radius=radius, source=source):
+                catalogue = self.store.catalogue(radius, source)
+                summary = self.store.summary(radius, source)
+                self.assertEqual([star["name"] for star in catalogue["stars"]], names)
+                self.assertEqual(summary["planets"], counts)
+                self.assertEqual(len(summary["flags"]), catalogue["system_star_count"])
+                self.assertEqual(summary["catalogue_fingerprint"], catalogue["catalogue_fingerprint"])
+                self.assertEqual(summary["names_crc"], catalogue["names_crc"])
+        with self.assertRaises(D.DatasetError):
+            self.store.catalogue(1000, "unknown")
+
+    def test_gaia_selection_includes_crossmatched_hyg_stars_and_aligned_planets(self):
+        with closing(sqlite3.connect(self.database)) as db:
+            db.execute("UPDATE stars SET extra=? WHERE name='Nearby'",
+                       ('{"gaia_dr3":{"source_id":"123"}}',))
+            db.execute("UPDATE stars SET extra=? WHERE name='Sol'",
+                       ('{"gaia_dr3":{}}',))
+            db.commit()
+        catalogue = self.store.catalogue(1000, "gaia")
+        summary = self.store.summary(1000, "gaia")
+        self.assertEqual([star["name"] for star in catalogue["stars"]], ["Nearby"])
+        self.assertEqual(summary["planets"], [0])
+        self.assertEqual(summary["catalogue_fingerprint"], catalogue["catalogue_fingerprint"])
+        self.assertEqual(summary["names_crc"], catalogue["names_crc"])
+        self.assertEqual(len(self.store.catalogue(1000, "both")["stars"]), 2)
 
     def test_clone_is_independent_and_sql_coordinate_edits_update_api(self):
         clone_path = self.root / "clone.sqlite"
@@ -153,6 +238,62 @@ class DatasetTests(unittest.TestCase):
         application._systems_state.clear()
         self.assertEqual(response.status_code, 200)
         self.assertEqual([star["name"] for star in response.json["stars"]], ["Sol"])
+
+    def test_star_catalogue_api_validates_and_applies_startup_radius(self):
+        with closing(sqlite3.connect(self.database)) as db:
+            db.execute("""
+                CREATE TABLE gaia_stars (
+                    source_id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL,
+                    x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL,
+                    colour TEXT NOT NULL, spectral_class TEXT NOT NULL,
+                    abs_mag REAL NOT NULL, extra TEXT NOT NULL, distance_pc REAL NOT NULL
+                )
+            """)
+            db.execute(
+                "INSERT INTO gaia_stars VALUES (?,?,?,?,?,?,?,?,?,?)",
+                ("gaia-one", "Gaia DR3 1", 1500, 0, 0, "#ffffff", "Other",
+                 5.0, '{"distance_pc":1500,"gaia_dr3":{"source_id":"1"}}', 1500),
+            )
+            db.commit()
+        application._systems_state.clear()
+        application._payload_cache.clear()
+        with patch.object(application, "DATASET_FILE", self.database):
+            client = application.app.test_client()
+            response = client.get("/api/stars?max_distance_pc=2000")
+            invalid = client.get("/api/stars?max_distance_pc=2001")
+            hyg = client.get("/api/stars?max_distance_pc=2000&source=hyg")
+            gaia = client.get("/api/stars?max_distance_pc=2000&source=gaia")
+            empty_gaia = client.get("/api/stars?max_distance_pc=1000&source=gaia")
+            gaia_summary = client.get("/api/systems-summary?max_distance_pc=2000&source=gaia")
+            hyg_summary = client.get("/api/systems-summary?max_distance_pc=2000&source=hyg")
+            compact = client.get("/api/stars?max_distance_pc=2000&source=gaia&compact=1")
+            bad_source = client.get("/api/stars?source=other")
+            bad_compact = client.get("/api/stars?compact=yes")
+            bad_summary = client.get("/api/systems-summary?source=other")
+            distinct_etag = client.get("/api/systems-summary?max_distance_pc=2000&source=hyg",
+                                       headers={"If-None-Match": gaia_summary.headers["ETag"]})
+        application._systems_state.clear()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["load_radius_pc"], 2000)
+        self.assertTrue(response.json["gaia_available"])
+        self.assertEqual(response.json["system_star_count"], len(self.stars))
+        self.assertEqual(response.json["gaia_star_count"], 1)
+        self.assertIn("Gaia DR3 1", [star["name"] for star in response.json["stars"]])
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual([s["name"] for s in hyg.json["stars"]], ["Sol", "Nearby"])
+        self.assertEqual([s["name"] for s in gaia.json["stars"]], ["Gaia DR3 1"])
+        self.assertEqual(empty_gaia.json["stars"], [])
+        self.assertEqual(gaia_summary.json["planets"], [])
+        self.assertEqual(compact.json["stars"][0]["distance_pc"], 1500)
+        self.assertNotIn("gaia_dr3", compact.json["stars"][0])
+        self.assertEqual(gaia.json["stars"][0]["gaia_dr3"]["source_id"], "1")
+        self.assertEqual(compact.json["catalogue_fingerprint"], gaia.json["catalogue_fingerprint"])
+        self.assertEqual(gaia_summary.json["catalogue_fingerprint"], gaia.json["catalogue_fingerprint"])
+        self.assertEqual(hyg_summary.json["planets"], [8, 0])
+        self.assertEqual(distinct_etag.status_code, 200)
+        self.assertEqual(bad_source.status_code, 400)
+        self.assertEqual(bad_compact.status_code, 400)
+        self.assertEqual(bad_summary.status_code, 400)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,16 @@ from query_api import create_query_blueprint
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 _dataset_setting = os.environ.get("STAREXPLORER_DATABASE")
-DATASET_FILE = Path(_dataset_setting) if _dataset_setting else DATA_DIR / "stars.sqlite"
+if _dataset_setting:
+    DATASET_FILE = Path(_dataset_setting)
+else:
+    DATASET_FILE = next(
+        (path for path in (DATA_DIR / "stars-gaia-temperatures.sqlite", DATA_DIR / "stars-gaia-nearby.sqlite",
+                           DATA_DIR / "stars-gaia-expanded.sqlite",
+                           DATA_DIR / "stars-gaia-enriched.sqlite", DATA_DIR / "stars.sqlite")
+         if path.is_file()),
+        DATA_DIR / "stars.sqlite",
+    )
 if not DATASET_FILE.is_absolute():
     DATASET_FILE = BASE_DIR / DATASET_FILE
 STARS_FILE = DATA_DIR / "stars.json"
@@ -33,6 +42,7 @@ GALAXY_TYPES = {"spiral", "elliptical", "irregular", "dwarf", "interacting", "pe
 
 REQUIRED_FIELDS = {"name": str, "x": (int, float), "y": (int, float), "z": (int, float),
                    "colour": str, "spectral_class": str}
+LOAD_RADII_PC = {1000, 2000, 5000}
 OPTIONAL_FIELDS = {"abs_mag": (int, float), "type": str, "constellation": str, "notes": str,
                    "distance_pc": (int, float), "ra_deg": (int, float), "dec_deg": (int, float),
                    "mass_msun": (int, float)}
@@ -145,14 +155,19 @@ def load_sovereignties(path: Path = SOVEREIGNTIES_FILE) -> dict:
     return data
 
 
-def stars_payload(path: Path = STARS_FILE, loader=load_stars) -> tuple[bytes, bytes]:
+def stars_payload(path: Path = STARS_FILE, loader=load_stars, cache_key=None) -> tuple[bytes, bytes]:
     stat = path.stat()
-    cached = _payload_cache.get(path)
+    key = (path, cache_key)
+    cached = _payload_cache.get(key)
     if cached is None or cached["mtime"] != stat.st_mtime_ns or cached["size"] != stat.st_size:
+        if path == DATASET_FILE:
+            for old_key in list(_payload_cache):
+                if old_key[0] == path:
+                    _payload_cache.pop(old_key, None)
         raw = json.dumps(loader(path), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         cached = {"mtime": stat.st_mtime_ns, "size": stat.st_size,
                   "raw": raw, "gzip": gzip.compress(raw, compresslevel=6)}
-        _payload_cache[path] = cached
+        _payload_cache[key] = cached
     return cached["raw"], cached["gzip"]
 
 
@@ -166,21 +181,44 @@ def about():
     return render_template("about.html")
 
 
-def json_file_response(path: Path, loader=load_stars) -> Response:
+def json_file_response(path: Path, loader=load_stars, cache_key=None) -> Response:
     try:
-        raw, compressed = stars_payload(path, loader)
+        raw, compressed = stars_payload(path, loader, cache_key)
     except (OSError, ValueError) as exc:
+        if path == DATASET_FILE:
+            return Response(json.dumps({"error": str(exc)}), status=503, mimetype="application/json")
         abort(503 if path == DATASET_FILE else 500, description=str(exc))
     return gzip_response(raw, compressed)
 
 
 @app.route("/api/stars")
 def api_stars():
-    return json_file_response(DATASET_FILE, load_catalogue)
+    max_distance_pc, source = catalogue_options()
+    compact = request.args.get("compact", "0")
+    if compact not in {"0", "1"}:
+        abort(400, description="compact must be 0 or 1.")
+    return json_file_response(
+        DATASET_FILE,
+        lambda path: load_catalogue(path, max_distance_pc, source, compact == "1"),
+        cache_key=(max_distance_pc, source, compact),
+    )
 
 
-def load_catalogue(path: Path) -> dict:
-    data = datasets.DatasetStore(path).catalogue()
+def catalogue_options():
+    try:
+        max_distance_pc = int(request.args.get("max_distance_pc", "1000"))
+    except ValueError:
+        abort(400, description="max_distance_pc must be 1000, 2000, or 5000.")
+    if max_distance_pc not in LOAD_RADII_PC:
+        abort(400, description="max_distance_pc must be 1000, 2000, or 5000.")
+    source = request.args.get("source", "both")
+    if source not in {"both", "hyg", "gaia"}:
+        abort(400, description="source must be both, hyg, or gaia.")
+    return max_distance_pc, source
+
+
+def load_catalogue(path: Path, max_distance_pc=1000, source="both", compact=False) -> dict:
+    data = datasets.DatasetStore(path).catalogue(max_distance_pc, source, compact)
     load_stars_list(data["stars"])
     return data
 
@@ -243,7 +281,7 @@ def gzip_response(raw: bytes, compressed: bytes) -> Response:
 
 @app.route("/api/systems-summary")
 def api_systems_summary():
-    return dataset_response("summary")
+    return dataset_response("summary", options=catalogue_options())
 
 
 @app.route("/api/system/<path:name>")
@@ -252,26 +290,28 @@ def api_system(name: str):
 
 
 @lru_cache(maxsize=16)
-def dataset_summary_payload(path: str, mtime_ns: int, size: int) -> tuple[bytes, bytes]:
-    raw = json.dumps(datasets.DatasetStore(path).summary(), ensure_ascii=False,
+def dataset_summary_payload(path: str, mtime_ns: int, size: int, max_distance_pc: int,
+                            source: str) -> tuple[bytes, bytes]:
+    raw = json.dumps(datasets.DatasetStore(path).summary(max_distance_pc, source), ensure_ascii=False,
                      separators=(",", ":"), allow_nan=False).encode("utf-8")
     return raw, gzip.compress(raw, compresslevel=6)
 
 
-def dataset_response(operation: str, name: str | None = None) -> Response:
+def dataset_response(operation: str, name: str | None = None, options=None) -> Response:
     try:
         state = systems_state()
         store = state["store"]
         stat = state["stat"]
         if operation == "summary":
-            raw, compressed = dataset_summary_payload(str(DATASET_FILE), stat.st_mtime_ns, stat.st_size)
+            raw, compressed = dataset_summary_payload(str(DATASET_FILE), stat.st_mtime_ns, stat.st_size,
+                                                       *options)
             response = gzip_response(raw, compressed)
         else:
             response = Response(json.dumps(store.system(name), ensure_ascii=False,
                                            separators=(",", ":"), allow_nan=False), mimetype="application/json")
         response.headers["Cache-Control"] = "no-cache"
         response.set_etag(
-            f"{store.meta['dataset_id']}-{stat.st_mtime_ns}-{operation}-{name or ''}".encode().hex()
+            f"{store.meta['dataset_id']}-{stat.st_mtime_ns}-{operation}-{name or ''}-{options}".encode().hex()
         )
         return response.make_conditional(request)
     except datasets.DatasetNotFound as exc:

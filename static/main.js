@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { emptyFilter, evaluateFilter, countConditions, parseFilter, serializeFilter } from './filters.js';
 import { createFilterBuilder } from './filter-builder.js';
-import { clearPrefs, loadPrefs, savePrefs, storageAvailable } from './prefs.js';
+import { clearPrefs, flushPrefs, loadPrefs, savePrefs, storageAvailable } from './prefs.js';
 import { createSubspace } from './subspace.js';
 import { disturbanceAt, SUBSPACE_RADIUS_PC } from './subspace-field.js';
 import { createMilkyWay } from './milky-way.js';
@@ -21,7 +21,7 @@ const LIST_NEAREST = 25;
 const LIST_MAX_MATCHES = 100;
 const HOME_DISTANCE_PC = 12;
 const DEFAULT_ABS_MAG = 5;
-const CATALOGUE_ID = /^(Gl|GJ|HD|HIP|HR|HYG)\s/;
+const CATALOGUE_ID = /^(Gl|GJ|HD|HIP|HR|HYG|Gaia DR3)\s/;
 const KIND_NEUTRON = 1;
 const KIND_BLACK_HOLE = 2;
 const KIND_NEBULA = 3;
@@ -77,6 +77,23 @@ function mainSpectralClass(sp) {
   const m = /^(?:sd|esd|d|g|c|k)?([OBAFGKM])/.exec(sp) || /^([obafgkm])(?![a-z])/.exec(sp);
   return m ? 'OBAFGKM'.indexOf(m[1].toUpperCase()) : SPEC_OTHER;
 }
+
+let loadedRadiusPc = 1000;
+let loadedSource = 'both';
+const loadDistanceSelect = document.getElementById('load-distance');
+const loadSourceSelect = document.getElementById('load-source');
+const applyLoadDistance = document.getElementById('apply-load-distance');
+function updateCatalogueButton() {
+  applyLoadDistance.disabled = Number(loadDistanceSelect.value) === loadedRadiusPc
+    && loadSourceSelect.value === loadedSource;
+}
+loadDistanceSelect.addEventListener('change', updateCatalogueButton);
+loadSourceSelect.addEventListener('change', updateCatalogueButton);
+applyLoadDistance.addEventListener('click', () => {
+  savePrefs(savedState, 0);
+  flushPrefs();
+  window.location.reload();
+});
 const OVERLAYS = [
   { kind: KIND_NEUTRON, url: '/api/neutron-stars', label: 'neutron stars' },
   { kind: KIND_BLACK_HOLE, url: '/api/black-holes', label: 'black holes' },
@@ -238,6 +255,7 @@ controls.listenToKeyEvents(window); // arrow keys pan
 // ---------- Star data (struct-of-arrays for speed) ----------
 let N = 0;
 let records = [];          // original JSON objects
+let systemStarCount = 0;   // prefix with planetary-system rows; Gaia-only rows follow it
 let pos;                   // Float32Array(3N), in the current display frame (see `frame`)
 let positionAttr = null;
 let frame = 'galactic';    // JSON data is equatorial J2000; it is rotated into this frame on load
@@ -245,7 +263,7 @@ let absMag;                // Float32Array(N)
 let namesLower = [];
 let isNamed;               // Uint8Array(N): 1 = proper name, 0 = catalogue id
 let kind;                  // Uint8Array(N): 0 = star, 1 = neutron star, 2 = black hole, 3 = nebula, 4 = galaxy
-let firstSpecial = 0;      // neutron stars / black holes / nebulae / galaxies are appended after the HYG stars
+let firstSpecial = 0;      // overlays are appended after all loaded stars
 const kindVisible = [true, true, true, true, true];
 let specClass;             // Uint8Array(N): index into SPEC_CLASSES (stars) or NEB_TYPES (nebulae)
 const classVisible = SPEC_CLASSES.map(() => true);
@@ -1215,12 +1233,13 @@ function updateFilter(force = false) {
   filterAnchor = anchor;
   starMaterial.uniforms.uFilterRadius.value = filterRadius;
   if (anchor >= 0) starPos(anchor, filterCentre);
+  else filterCentre.set(0, 0, 0);
   updateNebulaVisibility();
   const status = document.getElementById('distance-status');
-  if (anchor >= 0) {
+  if (filterRadius > 0) {
     let count = 0;
     for (let i = 0; i < N; i++) if (!isHidden(i)) count++;
-    status.textContent = `${count.toLocaleString()} shown within ${filterRadius} pc of ${records[anchor].name}`;
+    status.textContent = `${count.toLocaleString()} shown within ${filterRadius} pc of ${anchor >= 0 ? records[anchor].name : 'Sol'}`;
   } else {
     status.textContent = '';
   }
@@ -1253,7 +1272,8 @@ function selectStar(i) {
   const d = records[i];
   const p = starPos(i);
   document.getElementById('d-name').textContent = d.name;
-  document.getElementById('d-class').textContent = d.spectral_class;
+  document.getElementById('d-class').textContent = d.spectral_class
+    + (d.spectral_class_estimated === true ? ' (est.)' : '');
   document.getElementById('d-colour').textContent = d.colour;
   const sw = document.getElementById('d-swatch');
   sw.style.background = sw.style.color = d.colour;
@@ -1384,7 +1404,7 @@ function viewSphere(centrePoint, radius, instant = false) {
 
 function resetView(instant = false) {
   centre = solIndex;
-  const home = solIndex >= 0 ? starPos(solIndex) : allBounds.center;
+  const home = solIndex >= 0 ? starPos(solIndex) : new THREE.Vector3();
   viewSphere(home, HOME_DISTANCE_PC * Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) / 1.1, instant);
 }
 
@@ -1903,15 +1923,39 @@ window.addEventListener('resize', () => {
 // ---------- Load data & start ----------
 async function init() {
   document.getElementById('centre-info').textContent = 'Loading stars…';
+  const prefs = loadPrefs();
+  const savedRadius = Number(prefs.loadRadiusPc);
+  const loadRadiusPc = [1000, 2000, 5000].includes(savedRadius) ? savedRadius : 1000;
+  const loadSource = ['both', 'hyg', 'gaia'].includes(prefs.loadSource) ? prefs.loadSource : 'both';
+  document.getElementById('load-distance').value = String(loadRadiusPc);
+  loadSourceSelect.value = loadSource;
+  loadedRadiusPc = loadRadiusPc;
+  loadedSource = loadSource;
+  const catalogueQuery = new URLSearchParams({ max_distance_pc: String(loadRadiusPc), source: loadSource, compact: '1' });
   const [responses, sovResponse] = await Promise.all([
-    Promise.all([fetch('/api/stars'), ...OVERLAYS.map((o) => fetch(o.url))]),
+    Promise.all([fetch(`/api/stars?${catalogueQuery}`), ...OVERLAYS.map((o) => fetch(o.url))]),
     fetch('/api/sovereignties').catch((err) => ({ ok: false, status: err.message })),
   ]);
   const res = responses[0];
-  if (!res.ok) throw new Error(`Failed to load stars (${res.status})`);
+  if (!res.ok) {
+    const error = (await res.json().catch(() => null))?.error;
+    throw new Error(error ?? `Failed to load stars (${res.status})`);
+  }
   const db = await res.json();
   catalogueFingerprint = db.catalogue_fingerprint;
   records = db.stars.slice();
+  const actualLoadRadius = db.load_radius_pc ?? loadRadiusPc;
+  document.getElementById('load-distance').value = String(actualLoadRadius);
+  loadedRadiusPc = actualLoadRadius;
+  document.getElementById('load-distance-help').textContent = db.gaia_nearby_available
+    ? 'Selections are saved. Gaia includes matched HYG stars and quality-filtered additions.'
+    : db.gaia_available
+      ? 'This database has no nearby Gaia additions. Run the nearby Gaia import to add them.'
+      : 'This database has no Gaia additions. Import the Gaia DR3 extension to load them.';
+  systemStarCount = Number.isInteger(db.system_star_count) ? db.system_star_count : db.stars.length;
+  if (systemStarCount < 0 || systemStarCount > db.stars.length) {
+    throw new Error('Star catalogue has an invalid planetary-system boundary.');
+  }
   const kinds = [];
   const counts = [];
   for (let k = 0; k < OVERLAYS.length; k++) {
@@ -1971,12 +2015,18 @@ async function init() {
     planetCategories: PLANET_CATS, onApply: applyAdvancedFilter,
   });
   computeBounds();
+  const starCount = `${db.stars.length.toLocaleString()} stars`;
+  const gaiaCount = db.gaia_star_count > 0 ? `${db.gaia_star_count.toLocaleString()} Gaia DR3 additions` : null;
   document.getElementById('star-count').textContent =
-    [`${db.stars.length.toLocaleString()} stars`, ...counts].join(' · ');
+    [starCount, gaiaCount, ...counts].filter(Boolean).join(' · ');
 
   resetView(true);
   stepAnimation(performance.now());
   restorePrefs();
+  if (actualLoadRadius !== loadRadiusPc) {
+    savePrefs(savedState, 0);
+    flushPrefs();
+  }
   renderList();
   loadDataset();
   // Saved state that needs the planets dataset keeps the overlay up until loadDataset settles
@@ -2013,6 +2063,8 @@ function savedState() {
     planetCategories: [...planetVisible],
     hiddenSovereignties: sovereignties.filter((_, k) => !sovVisible[k]).map((s) => s.name),
     distance: document.getElementById('distance-filter').value,
+    loadRadiusPc: Number(document.getElementById('load-distance').value),
+    loadSource: loadSourceSelect.value,
     filter: pendingFilterText ?? serializeFilter(advancedFilter, filterGalaxies, filterLookups()),
     camera: {
       target: controls.target.toArray(),
@@ -2188,7 +2240,7 @@ const datasetStatus = document.getElementById('dataset-status');
 
 function catalogueNamesCrc() {
   let crc = 0xffffffff;
-  const bytes = new TextEncoder().encode(records.slice(0, firstSpecial).map((s) => s.name).join('\n'));
+  const bytes = new TextEncoder().encode(records.slice(0, systemStarCount).map((s) => s.name).join('\n'));
   for (const byte of bytes) {
     crc ^= byte;
     for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
@@ -2222,12 +2274,13 @@ async function loadDataset() {
   setDatasetStatus('Loading active dataset...');
   if (selected >= 0) updatePlanetRow(selected);
   try {
-    const summary = await datasetJson('/api/systems-summary');
+    const query = new URLSearchParams({ max_distance_pc: String(loadedRadiusPc), source: loadedSource });
+    const summary = await datasetJson(`/api/systems-summary?${query}`);
     if (request !== datasetRequest) return;
     if (!summary.dataset_id || !summary.name || !catalogueFingerprint
       || summary.names_crc !== catalogueNamesCrc()
       || summary.catalogue_fingerprint !== catalogueFingerprint
-      || summary.planets.length !== firstSpecial || summary.flags.length !== firstSpecial) {
+      || summary.planets.length !== systemStarCount || summary.flags.length !== systemStarCount) {
       throw new Error('Active dataset does not match the loaded star catalogue. Reload the page.');
     }
     if (!summary.planets.every((n) => Number.isInteger(n) && n >= 0 && n <= 65535)
@@ -2239,7 +2292,7 @@ async function loadDataset() {
     planetCat = new Int8Array(N).fill(-1);
     planetColours = naturalColours.slice();
     const rgb = PLANET_CATS.map((c) => hexToRgb(c.colour));
-    for (let i = 0; i < firstSpecial; i++) {
+    for (let i = 0; i < systemStarCount; i++) {
       const n = summary.planets[i], f = summary.flags[i];
       planetCount[i] = n;
       planetFlags[i] = f;
@@ -2286,7 +2339,7 @@ function finishDatasetError(err) {
 
 function renderPlanetLegend() {
   const counts = PLANET_CATS.map(() => 0);
-  for (let i = 0; i < firstSpecial; i++) counts[planetCat[i]]++;
+  for (let i = 0; i < systemStarCount; i++) counts[planetCat[i]]++;
   document.getElementById('planet-list').replaceChildren(...PLANET_CATS.map((c, k) => {
     const li = document.createElement('li');
     li.title = c.title;
@@ -2317,7 +2370,7 @@ function renderPlanetLegend() {
 
 function updatePlanetRow(i) {
   const row = document.getElementById('row-planets');
-  row.hidden = i < 0 || kind[i] !== 0;
+  row.hidden = i < 0 || i >= systemStarCount || kind[i] !== 0;
   if (row.hidden) {
     if (systemIndex >= 0) hideSystem();
     return;

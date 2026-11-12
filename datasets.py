@@ -14,6 +14,7 @@ import scenarios as C
 import systems as S
 
 SCHEMA = 1
+MAX_GAIA_STARS = 1_000_000
 STAR_COLUMNS = ("teff", "lum", "mass", "radius", "category", "spectral_class",
                 "abs_mag", "source", "metallicity", "provenance")
 PLANET_COLUMNS = (
@@ -313,57 +314,100 @@ class DatasetStore:
             row = db.execute(
                 "SELECT id,name,x,y,z FROM stars WHERE name=? OR id=?", (name, name)
             ).fetchone()
+            if row is None and self._has_gaia_stars(db):
+                row = db.execute(
+                    "SELECT source_id,name,x,y,z FROM gaia_stars WHERE name=? OR source_id=?",
+                    (name, name),
+                ).fetchone()
         if row is None:
             raise DatasetNotFound(f"No star named or identified as '{name}'.")
         return dict(zip(("id", "name", "x", "y", "z"), row))
+
+    @staticmethod
+    def _has_gaia_stars(db):
+        return db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='gaia_stars'"
+        ).fetchone() is not None
 
     def _query_meta(self):
         return {"dataset_id": self.meta["dataset_id"], "units": self.meta["units"],
                 "frame": self.meta["frame"]}
 
     def stars_within(self, x, y, z, radius, limit=100, offset=0):
-        predicate = """r.x_min <= ? AND r.x_max >= ? AND
-                       r.y_min <= ? AND r.y_max >= ? AND
-                       r.z_min <= ? AND r.z_max >= ?"""
-        params = (x + radius, x - radius, y + radius, y - radius, z + radius, z - radius)
-        distance = "sqrt((s.x-?)*(s.x-?)+(s.y-?)*(s.y-?)+(s.z-?)*(s.z-?))"
+        def branch(table, positions, identifier, abs_mag_present):
+            return f"""SELECT s.{identifier} AS id,s.name,s.x,s.y,s.z,s.colour,
+                              s.spectral_class,s.abs_mag,{abs_mag_present} AS abs_mag_present,
+                              s.extra
+                       FROM {positions} r JOIN {table} s ON s.rowid=r.star_rowid
+                       WHERE r.x_min <= ? AND r.x_max >= ?
+                         AND r.y_min <= ? AND r.y_max >= ?
+                         AND r.z_min <= ? AND r.z_max >= ?
+                         AND sqrt((s.x-?)*(s.x-?)+(s.y-?)*(s.y-?)+(s.z-?)*(s.z-?)) <= ?"""
+        distance = "sqrt((x-?)*(x-?)+(y-?)*(y-?)+(z-?)*(z-?))"
+        bounds = (x + radius, x - radius, y + radius, y - radius, z + radius, z - radius)
+        exact = (x, x, y, y, z, z, radius)
         with closing(self.connect()) as db:
+            branches = [branch("stars", "star_positions", "id", "s.abs_mag_present")]
+            if self._has_gaia_stars(db):
+                branches.append(branch("gaia_stars", "gaia_star_positions", "source_id", "1"))
+            union = " UNION ALL ".join(branches)
             count = db.execute(
-                f"""SELECT count(*) FROM star_positions r JOIN stars s ON s.rowid=r.star_rowid
-                    WHERE {predicate} AND {distance} <= ?""",
-                params + (x, x, y, y, z, z, radius),
+                f"SELECT count(*) FROM ({union})",
+                (bounds + exact) * len(branches),
             ).fetchone()[0]
             rows = db.execute(
-                f"""{self._star_select()}, {distance} AS distance_pc
-                    FROM star_positions r JOIN stars s ON s.rowid=r.star_rowid
-                    WHERE {predicate} AND {distance} <= ?
-                    ORDER BY distance_pc,s.name LIMIT ? OFFSET ?""",
-                (x, x, y, y, z, z) + params + (x, x, y, y, z, z, radius, limit, offset),
+                f"""SELECT *,{distance} AS distance_pc FROM ({union})
+                    ORDER BY distance_pc,name LIMIT ? OFFSET ?""",
+                (x, x, y, y, z, z) + (bounds + exact) * len(branches) + (limit, offset),
             )
-            stars = [self._query_star_from_row(row) for row in rows]
+            stars = []
+            for row in rows:
+                identifier = row[0]
+                star = self._star_from_row((*row[1:10], row[10]))
+                star["id"] = identifier
+                stars.append(star)
         return dict(self._query_meta(), center={"x": x, "y": y, "z": z},
                     radius_pc=radius, total=count, limit=limit, offset=offset, stars=stars)
 
     def nearest_stars(self, x, y, z, limit=25, max_radius=None):
-        if max_radius is None:
-            where = ""
-            params = ()
-        else:
-            where = """WHERE r.x_min <= ? AND r.x_max >= ? AND
-                              r.y_min <= ? AND r.y_max >= ? AND
-                              r.z_min <= ? AND r.z_max >= ? AND
-                              sqrt((s.x-?)*(s.x-?)+(s.y-?)*(s.y-?)+(s.z-?)*(s.z-?)) <= ?"""
-            params = (x + max_radius, x - max_radius, y + max_radius, y - max_radius,
-                      z + max_radius, z - max_radius, x, x, y, y, z, z, max_radius)
-        distance = "sqrt((s.x-?)*(s.x-?)+(s.y-?)*(s.y-?)+(s.z-?)*(s.z-?))"
+        def branch(table, positions, identifier, abs_mag_present):
+            if max_radius is None:
+                where = ""
+                params = ()
+            else:
+                where = """WHERE r.x_min <= ? AND r.x_max >= ?
+                                 AND r.y_min <= ? AND r.y_max >= ?
+                                 AND r.z_min <= ? AND r.z_max >= ?
+                                 AND sqrt((s.x-?)*(s.x-?)+(s.y-?)*(s.y-?)+(s.z-?)*(s.z-?)) <= ?"""
+                params = (x + max_radius, x - max_radius, y + max_radius, y - max_radius,
+                          z + max_radius, z - max_radius, x, x, y, y, z, z, max_radius)
+            return (
+                f"""SELECT s.{identifier} AS id,s.name,s.x,s.y,s.z,s.colour,
+                           s.spectral_class,s.abs_mag,{abs_mag_present} AS abs_mag_present,
+                           s.extra FROM {positions} r JOIN {table} s ON s.rowid=r.star_rowid
+                     {where}""",
+                params,
+            )
         with closing(self.connect()) as db:
+            sources = [("stars", "star_positions", "id", "s.abs_mag_present")]
+            if self._has_gaia_stars(db):
+                sources.append(("gaia_stars", "gaia_star_positions", "source_id", "1"))
+            branches = [branch(*source) for source in sources]
+            union = " UNION ALL ".join(sql for sql, _ in branches)
+            distance = "sqrt((x-?)*(x-?)+(y-?)*(y-?)+(z-?)*(z-?))"
+            params = tuple(value for _, values in branches for value in values)
             rows = db.execute(
-                f"""{self._star_select()}, {distance} AS distance_pc
-                    FROM star_positions r JOIN stars s ON s.rowid=r.star_rowid
-                    {where} ORDER BY distance_pc,s.name LIMIT ?""",
+                f"""SELECT *,{distance} AS distance_pc FROM ({union})
+                    ORDER BY distance_pc,name LIMIT ?""",
                 (x, x, y, y, z, z) + params + (limit,),
             )
-            stars = [self._query_star_from_row(row) for row in rows]
+            stars = []
+            for row in rows:
+                identifier = row[0]
+                star = self._star_from_row((*row[1:10], None))
+                star["id"] = identifier
+                star["distance_pc"] = row[10]
+                stars.append(star)
         return dict(self._query_meta(), center={"x": x, "y": y, "z": z},
                     max_radius_pc=max_radius, limit=limit, stars=stars)
 
@@ -374,6 +418,11 @@ class DatasetStore:
                     """SELECT id,name,x,y,z,colour,spectral_class,abs_mag,abs_mag_present,extra
                        FROM stars WHERE name=? OR id=?""", (value, value)
                 ).fetchone()
+                if row is None and self._has_gaia_stars(db):
+                    row = db.execute(
+                        """SELECT source_id,name,x,y,z,colour,spectral_class,abs_mag,1,extra
+                           FROM gaia_stars WHERE name=? OR source_id=?""", (value, value)
+                    ).fetchone()
                 if row is None:
                     raise DatasetNotFound(f"No star named or identified as '{value}'.")
                 identifier, *fields = row
@@ -386,41 +435,89 @@ class DatasetStore:
                     + (left["z"] - right["z"]) ** 2) ** 0.5
         return dict(self._query_meta(), distance_pc=distance, stars=[left, right])
 
-    def catalogue(self):
+    def _catalogue_system_stars(self, db, max_distance_pc, source):
+        if source not in {"both", "hyg", "gaia"}:
+            raise DatasetError("Catalogue source must be both, hyg, or gaia.")
+        stars, ordinals = [], []
+        for row in db.execute(
+            """SELECT ordinal,name,x,y,z,colour,spectral_class,abs_mag,abs_mag_present,extra
+               FROM stars WHERE x*x+y*y+z*z <= ? ORDER BY ordinal""",
+            (max_distance_pc * max_distance_pc,),
+        ):
+            if source == "gaia" and not json.loads(row[-1]).get("gaia_dr3", {}).get("source_id"):
+                continue
+            ordinals.append(row[0])
+            stars.append(self._star_from_row((*row[1:], None)))
+        return stars, ordinals
+
+    def catalogue(self, max_distance_pc=1000, source="both", compact=False):
         with closing(self.connect()) as db:
-            stars = []
-            for row in db.execute(
-                "SELECT name,x,y,z,colour,spectral_class,abs_mag,abs_mag_present,extra FROM stars ORDER BY ordinal"
-            ):
-                stars.append(self._star_from_row((*row, None)))
+            system_stars, _ = self._catalogue_system_stars(db, max_distance_pc, source)
+            tables = {row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='gaia_stars'"
+            )}
+            gaia_stars = []
+            gaia_available = bool(tables)
+            if tables and source != "hyg":
+                gaia_count = db.execute(
+                    "SELECT count(*) FROM gaia_stars WHERE distance_pc <= ?",
+                    (max_distance_pc,),
+                ).fetchone()[0]
+                if gaia_count > MAX_GAIA_STARS:
+                    raise DatasetError(
+                        f"Requested radius contains {gaia_count:,} Gaia stars, above the "
+                        f"{MAX_GAIA_STARS:,}-star safety limit."
+                    )
+                for row in db.execute(
+                    """SELECT name,x,y,z,colour,spectral_class,abs_mag,1,extra,distance_pc
+                       FROM gaia_stars WHERE distance_pc <= ? ORDER BY distance_pc,source_id""",
+                    (max_distance_pc,),
+                ):
+                    if compact:
+                        name, x, y, z, colour, spectral_class, abs_mag, _, extra, distance = row
+                        star = {"name": name, "x": x, "y": y, "z": z, "colour": colour,
+                                "spectral_class": spectral_class, "abs_mag": abs_mag,
+                                "distance_pc": distance}
+                        if spectral_class != "Other" and json.loads(extra).get("spectral_class_estimated") is True:
+                            star["spectral_class_estimated"] = True
+                        gaia_stars.append(star)
+                    else:
+                        gaia_stars.append(self._star_from_row(row))
+        stars = system_stars + gaia_stars
         return {
             "units": self.meta["units"],
             "frame": self.meta["frame"],
             "stars": stars,
             "dataset_id": self.meta["dataset_id"],
             "dataset_name": self.meta["name"],
-            "catalogue_fingerprint": C.fingerprint(stars),
-            "names_crc": S.names_crc(stars),
+            "system_star_count": len(system_stars),
+            "gaia_star_count": len(gaia_stars),
+            "gaia_available": gaia_available,
+            "gaia_nearby_available": "gaia_nearby_import" in self.meta,
+            "load_radius_pc": max_distance_pc,
+            "source": source,
+            "catalogue_fingerprint": C.fingerprint(system_stars),
+            "names_crc": S.names_crc(system_stars),
         }
 
-    def summary(self):
+    def summary(self, max_distance_pc=1000, source="both"):
         counts = [0] * self.meta["star_count"]
         flags = [0] * self.meta["star_count"]
         with closing(self.connect()) as db:
+            system_stars, ordinals = self._catalogue_system_stars(db, max_distance_pc, source)
             for ordinal, flag, count in db.execute(
                 """SELECT s.ordinal,coalesce(y.flags,0),count(p.id)
                    FROM stars s LEFT JOIN systems y ON y.star_id=s.id
                    LEFT JOIN planets p ON p.star_id=s.id GROUP BY s.id ORDER BY s.ordinal"""
             ):
                 flags[ordinal], counts[ordinal] = flag, count
-        catalogue = self.catalogue()
         return {
             "dataset_id": self.meta["dataset_id"],
             "name": self.meta["name"],
-            "catalogue_fingerprint": catalogue["catalogue_fingerprint"],
-            "names_crc": catalogue["names_crc"],
-            "planets": counts,
-            "flags": flags,
+            "catalogue_fingerprint": C.fingerprint(system_stars),
+            "names_crc": S.names_crc(system_stars),
+            "planets": [counts[ordinal] for ordinal in ordinals],
+            "flags": [flags[ordinal] for ordinal in ordinals],
         }
 
     def _system(self, db, name):

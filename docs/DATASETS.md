@@ -2,7 +2,9 @@
 
 The app loads one complete dataset selected by the backend. The browser has no dataset selector:
 set `STAREXPLORER_DATABASE` for the server process, restart the server, and reload the page to switch.
-The default is `data/stars.sqlite`.
+The default is `data/stars.sqlite`. If present, `data/stars-gaia-temperatures.sqlite`, `data/stars-gaia-nearby.sqlite`,
+`data/stars-gaia-expanded.sqlite` or `data/stars-gaia-enriched.sqlite` takes priority, in that order. `STAREXPLORER_DATABASE` overrides
+the default selection.
 
 Each dataset is a self-contained SQLite file with:
 
@@ -15,6 +17,20 @@ Each dataset is a self-contained SQLite file with:
 - `metadata`: dataset identity, display name, coordinate frame, units and schema version.
 - `star_positions`: an R-Tree spatial index maintained when rows in `stars` are inserted, updated or
   deleted.
+- Optional `gaia_stars`: Gaia DR3-only catalogue sources, with a matching `gaia_star_positions`
+  spatial index. These records are separate from `stars` and intentionally have no `systems`,
+  planets, or moons.
+
+The map endpoints `/api/stars` and `/api/systems-summary` accept the same `source` (`both`,
+`hyg`, or `gaia`) and `max_distance_pc` (1000, 2000, or 5000) parameters. Defaults are `both`
+and 1000. Gaia includes crossmatched HYG stars and Gaia-only additions. The radius is measured
+from Sol and applies to both tables; summary arrays correspond only to the selected `stars` rows,
+in catalogue order. Gaia additions are an imported, deduplicated subset, not the complete Gaia
+catalogue. A database without the optional table reports `gaia_available: false` and contributes
+no Gaia additions; `gaia_nearby_available` indicates whether the nearby import was performed.
+The map uses `/api/stars?compact=1` to omit the detailed Gaia-only measurements from its startup
+payload, but retains the estimated-class flag. The default response and the spatial-query endpoints
+still include the Gaia GSP-Phot temperatures, uncertainty bounds and estimation provenance.
 
 The app opens the selected database read-only. System details and derived fields are assembled from
 the normalized rows when requested. Planet counts are computed from the planet table; summary flags
@@ -149,10 +165,10 @@ to planets or moons, preserve valid physical values and provenance, then refresh
 ```
 
 `refresh` recalculates flags from normalized planetary inputs. It is an offline operation over the
-complete dataset; stop the web app while editing or refreshing. A dataset should contain one `stars`
-and one `systems` row per mapped star. Adding a new star therefore also requires its system row and,
-optionally, planet, moon and host rows. Keep `stars.ordinal` contiguous and update `metadata.star_count`
-when adding or removing catalogue entries.
+complete dataset; stop the web app while editing or refreshing. A system-backed dataset should contain
+one `stars` and one `systems` row per system. Gaia-only catalogue sources are kept in the optional
+`gaia_stars` table and do not receive fabricated system rows. Keep `stars.ordinal` contiguous and
+update `metadata.star_count` when adding or removing system-backed catalogue entries.
 
 The JSON files under `data/` remain inputs for importing or regenerating catalogue data; changing them
 does not mutate an already-built SQLite dataset. Re-import or update the database explicitly, then

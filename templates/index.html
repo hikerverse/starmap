@@ -172,6 +172,24 @@
       <button id="close-controls" type="button" aria-label="Close display controls">Close</button>
     </div>
     <div id="star-count"></div>
+    <div class="load-distance">
+      <label for="load-source">Star catalogue
+        <select id="load-source">
+          <option value="hyg">HYG</option>
+          <option value="gaia">GAIA</option>
+          <option value="both">Both</option>
+        </select>
+      </label>
+      <label for="load-distance">Load stars from Sol out to
+        <select id="load-distance">
+          <option value="1000">1 kpc</option>
+          <option value="2000">2 kpc</option>
+          <option value="5000">5 kpc</option>
+        </select>
+      </label>
+      <button id="apply-load-distance" type="button" disabled>Reload catalogue</button>
+      <small id="load-distance-help">Selections are saved. Gaia is a quality-filtered sample.</small>
+    </div>
     <div class="toolbar">
       <label class="frame-row" title="Galactic: X towards the Galactic Centre, Y towards l = 90&deg;, Z towards the North Galactic Pole (right-handed). Equatorial: J2000, X towards RA 0h, Z towards the North Celestial Pole.">
         Frame <select id="frame-select">
@@ -384,6 +402,7 @@
               Star positions are unchanged. Cloud detail, the bar and disk thickness remain illustrative;
               this uncertain model does not assign individual stars to arms. The checkbox is saved with your view.</dd>
             <dt>Show within</dt><dd>Quickly limit the map to objects within a number of parsecs of the selected star (or the centre when nothing is selected).</dd>
+            <dt>Star catalogue and load radius</dt><dd>Choose HYG, GAIA, or Both, and a radius from Sol (1, 2, or 5 kpc), then reload. These selections are saved. GAIA includes HYG stars matched to Gaia and a quality-filtered sample of Gaia additions. Matched stars retain their HYG positions and planetary systems; additions have no planetary-system data. Some Gaia additions have broad spectral classes estimated from their Gaia temperatures, marked (est.); temperature alone cannot determine luminosity class. Both displays each matched star once. Other object overlays are independent of this selection.</dd>
             <dt>Subspace disturbance</dt><dd>Open <b>View &rarr; Subspace disturbance...</b> for an optional fictional volumetric field within 1,200 pc of Sol.
               Change <b>Seed</b> or use <b>Regenerate</b> for a different field; the same seed and generation
               version reproduce it. <b>Glow</b> changes appearance only. Cloud brightness accumulates along the

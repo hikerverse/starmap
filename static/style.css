@@ -147,6 +147,13 @@ body.about-page { height: auto; min-height: 100%; overflow: auto; background: #0
 #orientation-views { display: flex; gap: 4px; margin-top: 5px; pointer-events: auto; }
 #orientation-views button { padding: 2px 5px; font-size: 11px; }
 #star-count { opacity: 0.6; font-size: 12px; margin-bottom: 8px; }
+.load-distance {
+  display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; padding: 8px;
+  border: 1px solid #2c3a66; border-radius: 4px; font-size: 12px;
+}
+.load-distance label { display: flex; align-items: center; gap: 6px; }
+.load-distance select { flex: 1; min-width: 0; }
+.load-distance small { color: #aebbdc; }
 #star-panel {
   top: 52px; left: 268px; width: 250px; height: min(520px, calc(100% - 200px)); min-height: 180px;
   box-sizing: border-box; display: flex; flex-direction: column; z-index: 5;

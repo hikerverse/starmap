@@ -20,9 +20,11 @@ py -3.13 -m venv .venv
 $env:PORT=5057; .\.venv\Scripts\python app.py   # use another port if 5001 is busy
 ```
 
-The map and planetary systems are loaded from the active standalone SQLite dataset. The default file
-is `data/stars.sqlite`; see [SQLite datasets](docs/DATASETS.md) to import it or clone and activate a
-different dataset.
+The map and planetary systems are loaded from the active standalone SQLite dataset. The app prefers
+`data/stars-gaia-temperatures.sqlite`, then `data/stars-gaia-nearby.sqlite`, then `data/stars-gaia-expanded.sqlite`, then
+`data/stars-gaia-enriched.sqlite`, then `data/stars.sqlite`;
+`STAREXPLORER_DATABASE` overrides that order. See [SQLite datasets](docs/DATASETS.md) to import a
+database or clone and activate a different one.
 
 ### Run with Gunicorn on Linux
 
@@ -388,6 +390,79 @@ HR designations.
 Caveats: HYG distances come from Hipparcos parallaxes, so they become uncertain beyond a few hundred parsecs
 and a few stars with bad parallaxes appear in odd places. The catalogue is also magnitude-limited, so
 faint stars (most red dwarfs) are missing beyond ~20 pc.
+
+### Enriching the star database with Gaia DR3
+
+The existing catalogue can be enriched without changing its names, positions, or planetary-system links.
+The offline importer recovers HYG identifiers, uses the Gaia Archive's Hipparcos cross-match where
+unambiguous, and tries a position match for remaining HYG stars after propagating their coordinates
+from J2000 to Gaia's reference epoch. Position matches are accepted only when exactly one Gaia source
+is found within 2 arcseconds; ambiguous and unmatched stars are listed in a CSV report. This radius
+captures 99.8% of the uniquely cross-matched HYG/Hipparcos sources tested against Gaia DR3.
+
+```powershell
+.\.venv\Scripts\python tools\enrich_gaia.py `
+  data\stars.sqlite data\stars-gaia-enriched.sqlite
+$env:STAREXPLORER_DATABASE = "data\stars-gaia-enriched.sqlite"
+.\.venv\Scripts\python app.py
+```
+
+The command requires an internet connection to the [Gaia Archive TAP service](https://gea.esac.esa.int/tap-server/tap)
+and creates a separate database plus `data\stars-gaia-enriched.gaia-report.csv`; it refuses to overwrite
+either output. Gaia values are stored under each star's `gaia_dr3` object in the SQLite `extra` field.
+It includes the source ID, Gaia position, parallax and uncertainty, proper motion and uncertainties,
+G/BP/RP mean magnitudes, RUWE, astrometric solution type, and match provenance. Gaia DR3 source IDs
+are strings so their 64-bit values remain exact in JSON. A successful cross-match does not replace the
+catalogue's original coordinates or distances. See the [Gaia DR3 data model](https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/)
+and [Gaia data credits](https://www.cosmos.esa.int/web/gaia-users/credits) when using the measurements.
+
+### Adding Gaia DR3 stars
+
+The importer adds a separate `gaia_stars` table and does not invent planetary-system rows.
+It downloads sources with nominal parallax distances within 5 kpc, parallax signal-to-noise
+of at least 5, RUWE below 1.4, a five- or six-parameter astrometric solution, and Gaia G magnitude
+10.8 or brighter. These cuts select only a fraction of Gaia. Gaia distances are inverse-parallax
+estimates, and display colours are approximate from BP-RP.
+
+```powershell
+.\.venv\Scripts\python tools\import_gaia_stars.py
+.\.venv\Scripts\python tools\import_gaia_stars.py --nearby
+```
+
+The first command copies `data\stars-gaia-enriched.sqlite` to `data\stars-gaia-expanded.sqlite`
+and imports the 1–5 kpc sample. The second copies that database to `data\stars-gaia-nearby.sqlite`
+and adds the sample within 1 kpc. Neither overwrites the source. Each command counts candidates and
+refuses more than 1,000,000 candidates and existing additions in total; use `--max-g-mag` for a
+brighter limit if needed. The app automatically prefers the nearby database when present.
+The saved **Star catalogue** control selects HYG, GAIA, or Both; **Load stars from Sol out to**
+applies a 1, 2, or 5 kpc radius. Reload to apply changes. GAIA includes HYG entries with Gaia
+crossmatches (using their original HYG positions and planetary systems) plus the deduplicated Gaia
+additions; Both also includes HYG entries without a crossmatch. Gaia additions have no planetary
+systems. Other object overlays are controlled separately. Larger selections require more memory.
+
+For map alignment, Gaia positions are propagated from DR3's 2016 reference epoch back to J2000;
+the original Gaia coordinates and proper motions remain in the row's `gaia_dr3` data. The importer
+excludes source IDs already matched to existing stars and probable positional matches within 5
+arcseconds for the remaining unmatched stars. The Gaia Archive may temporarily reject or delay TAP
+queries when its anonymous job queue is busy.
+The importer retries HTTP 429 responses and does not publish a database unless the complete result
+passes validation.
+
+### Estimating Gaia spectral classes
+
+```powershell
+.\.venv\Scripts\python tools\estimate_gaia_spectral.py
+```
+
+This copies `data\stars-gaia-nearby.sqlite` to a new `data\stars-gaia-temperatures.sqlite` and
+retrieves Gaia DR3 GSP-Phot effective temperatures and their 16th–84th percentile bounds for the
+imported sample. The app prefers this database when present. For Gaia-only additions, an approximate
+O/B/A/F/G/K/M class is assigned using broad main-sequence temperature ranges only when both
+confidence bounds fall in the same range; otherwise it remains Other. Details mark estimates
+**(est.)**. Temperature alone does not determine luminosity class or identify unusual stars, and
+Gaia temperatures can have systematic errors even when the reported bounds are narrow.
+The original temperature and bounds remain in the full catalogue and spatial-query API data.
+HYG classifications are unchanged. Existing databases are not overwritten.
 
 ## Neutron star database
 
