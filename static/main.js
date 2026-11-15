@@ -83,7 +83,11 @@ let loadedSource = 'both';
 const loadDistanceSelect = document.getElementById('load-distance');
 const loadSourceSelect = document.getElementById('load-source');
 const applyLoadDistance = document.getElementById('apply-load-distance');
-const viewFromPanel = document.getElementById('view-from-panel');
+const viewFromSearch = document.getElementById('view-from-search');
+const viewFromResults = document.getElementById('view-from-results');
+const viewFromOptions = document.getElementById('view-from-options');
+const viewTowardSearch = document.getElementById('view-toward-search');
+const viewTowardResults = document.getElementById('view-toward-results');
 const viewFromPreset = document.getElementById('view-from-preset');
 const viewFromMagnitude = document.getElementById('view-from-magnitude');
 const viewFromMagnitudeValue = document.getElementById('view-from-magnitude-value');
@@ -1285,6 +1289,7 @@ function updateFilter(force = false) {
 function selectStar(i) {
   selected = i;
   updateFilter();
+  refreshViewFromResults();
   labelsDirty = true;
   selectionRing.visible = i >= 0;
   selectedDrop.set(i);
@@ -1344,7 +1349,7 @@ function selectStar(i) {
     ? `${fmt(sol)} (${(sol * 3.26156).toFixed(2)} ly)`
     : formatDistance(sol);
   updateCentreDistance();
-  document.getElementById('details').classList.toggle('hidden', viewFromIndex >= 0);
+  document.getElementById('details').classList.toggle('hidden', viewFromIndex >= 0 && selected < 0);
 }
 
 function updateCentreDistance() {
@@ -1445,6 +1450,59 @@ function updateViewFromVisibility() {
   }
   viewFromCount.textContent = `${visible.toLocaleString()} catalogue stars meet this limit`;
   updateFilter(true);
+  refreshViewFromResults();
+}
+
+function refreshViewFromResults() {
+  const viewingFromStar = viewFromIndex >= 0;
+  renderViewFromResults(viewFromSearch, viewFromResults, viewingFromStar);
+  renderViewFromResults(viewTowardSearch, viewTowardResults, viewingFromStar);
+}
+
+function renderViewFromResults(input, list, eligibleOnly) {
+  const query = input.value.trim().toLowerCase();
+  if (query.length < 2) {
+    list.replaceChildren();
+    return;
+  }
+  const best = [];
+  for (let i = 0; i < N; i++) {
+    if (kind[i] !== 0 || isHidden(i) || !namesLower[i].includes(query)) continue;
+    const startsWith = namesLower[i].startsWith(query);
+    const magnitude = eligibleOnly ? viewFromApparentMagnitude[i] : brightnessFromSol(i);
+    const candidate = { index: i, startsWith, magnitude };
+    let at = best.findIndex((entry) => Number(startsWith) > Number(entry.startsWith)
+      || (startsWith === entry.startsWith && magnitude < entry.magnitude));
+    if (at < 0) at = best.length;
+    if (at < 12) {
+      best.splice(at, 0, candidate);
+      if (best.length > 12) best.pop();
+    }
+  }
+  list.replaceChildren(...best.map(({ index, magnitude }) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = `${records[index].name} · mag ${magnitude.toFixed(2)}`;
+    button.title = records[index].name;
+    button.addEventListener('click', () => {
+      if (list === viewFromResults) setViewFromStar(index);
+      else aimViewFromAt(index);
+    });
+    item.append(button);
+    return item;
+  }));
+}
+
+function aimViewFromAt(i) {
+  if (viewFromIndex < 0 || kind[i] !== 0 || isHidden(i)) return;
+  const target = starPos(i);
+  if (target.distanceToSquared(camera.position) === 0) return;
+  camera.lookAt(target);
+  controls.target.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()));
+  document.getElementById('view-from-direction').textContent = `Looking toward ${records[i].name}`;
+  updateCameraInfo();
+  labelsDirty = true;
 }
 
 function setViewFromStar(i) {
@@ -1479,8 +1537,10 @@ function setViewFromStar(i) {
   }
   starMaterial.uniforms.uViewFromEnabled.value = 1.0;
   document.getElementById('view-from-name').textContent = records[i].name;
-  viewFromPanel.classList.remove('hidden');
-  document.getElementById('details').classList.add('hidden');
+  viewFromSearch.value = records[i].name;
+  viewFromOptions.hidden = false;
+  viewTowardSearch.value = '';
+  document.getElementById('view-from-direction').textContent = 'Looking in the current direction.';
   document.getElementById('orientation-widget').style.display = 'none';
   document.getElementById('frame-select').disabled = true;
   helpers.visible = false;
@@ -1507,13 +1567,18 @@ function exitViewFrom() {
   camera.updateProjectionMatrix();
   centre = viewFromState.centre;
   viewFromState = null;
-  viewFromPanel.classList.add('hidden');
+  viewFromOptions.hidden = true;
+  document.getElementById('view-from-name').textContent = '';
+  viewTowardSearch.value = '';
+  viewTowardResults.replaceChildren();
+  document.getElementById('view-from-direction').textContent = 'Looking in the current direction.';
   document.getElementById('details').classList.toggle('hidden', selected < 0);
   document.getElementById('orientation-widget').style.display = '';
   document.getElementById('frame-select').disabled = false;
   helpers.visible = document.getElementById('toggle-grid').checked;
   selectionRing.visible = selected >= 0;
   updateFilter(true);
+  refreshViewFromResults();
   updateCentreInfo();
   updateCameraInfo();
   labelsDirty = true;
@@ -1528,6 +1593,15 @@ viewFromMagnitude.addEventListener('input', () => {
   if (viewFromIndex >= 0) updateViewFromVisibility();
 });
 document.getElementById('close-view-from').addEventListener('click', exitViewFrom);
+let viewFromSearchTimer = null;
+for (const [input, list] of [[viewFromSearch, viewFromResults], [viewTowardSearch, viewTowardResults]]) {
+  input.addEventListener('input', () => {
+    clearTimeout(viewFromSearchTimer);
+    viewFromSearchTimer = setTimeout(() => {
+      renderViewFromResults(input, list, viewFromIndex >= 0);
+    }, 120);
+  });
+}
 
 const VIEW_DIR = new THREE.Vector3(1, -1.4, 0.9).normalize();
 
@@ -1943,6 +2017,7 @@ function visibilityChanged() {
   updateFilter(true);
   labelsDirty = true;
   renderList();
+  refreshViewFromResults();
   persist();
 }
 document.getElementById('colour-mode').addEventListener('change', (e) => {
@@ -2038,6 +2113,7 @@ document.getElementById('distance-filter').addEventListener('input', (e) => {
     const r = parseFloat(e.target.value);
     filterRadius = Number.isFinite(r) && r > 0 ? r : 0;
     updateFilter();
+    refreshViewFromResults();
     persist();
   }, 200);
 });
@@ -2195,6 +2271,7 @@ async function init() {
     flushPrefs();
   }
   renderList();
+  refreshViewFromResults();
   loadDataset();
   // Saved state that needs the planets dataset keeps the overlay up until loadDataset settles
   if (!pendingFilterText && !pendingColourMode) finishLoading();

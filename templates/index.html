@@ -22,27 +22,6 @@
   <div id="canvas-container"></div>
   <div id="labels"></div>
 
-  <section id="view-from-panel" class="panel hidden" aria-labelledby="view-from-title">
-    <div class="view-from-heading">
-      <h2 id="view-from-title">View from <span id="view-from-name"></span></h2>
-      <button id="close-view-from" type="button">Exit</button>
-    </div>
-    <label for="view-from-preset">Viewing conditions</label>
-    <select id="view-from-preset">
-      <option value="3">Bright night sky (mag 3)</option>
-      <option value="6.5" selected>Very dark night sky (mag 6.5)</option>
-      <option value="9">Binoculars (mag 9)</option>
-      <option value="12">Small telescope (mag 12)</option>
-      <option value="custom">Custom</option>
-    </select>
-    <label for="view-from-magnitude">Limiting magnitude
-      <output id="view-from-magnitude-value" for="view-from-magnitude">6.5</output>
-    </label>
-    <input id="view-from-magnitude" type="range" min="-2" max="15" step="0.1" value="6.5">
-    <p id="view-from-count" role="status" aria-live="polite"></p>
-    <small>Approximate: catalogue coverage is incomplete; instrument limits are illustrative.</small>
-  </section>
-
   <nav id="top-menu" aria-label="Application menu">
     <button id="toggle-controls" type="button" aria-expanded="false" aria-controls="sidebar">Controls</button>
     <details id="view-menu">
@@ -279,6 +258,36 @@
     <h2 id="d-name"></h2>
     <button id="focus-selected" type="button">Centre on object</button>
     <button id="view-from-selected" type="button" hidden>View from</button>
+    <section id="view-from-panel" class="view-from-controls" aria-labelledby="view-from-title">
+      <div class="view-from-heading">
+        <h3 id="view-from-title">View from</h3>
+        <span id="view-from-name" aria-live="polite"></span>
+      </div>
+      <label for="view-from-search">Choose an observer star</label>
+      <input id="view-from-search" type="search" placeholder="Search visible stars..." autocomplete="off">
+      <ul id="view-from-results" class="view-from-results" aria-label="Visible observer stars"></ul>
+      <div id="view-from-options" hidden>
+        <label for="view-toward-search">Point camera at</label>
+        <input id="view-toward-search" type="search" placeholder="Search visible stars..." autocomplete="off">
+        <ul id="view-toward-results" class="view-from-results" aria-label="Visible target stars"></ul>
+        <small id="view-from-direction" aria-live="polite">Looking in the current direction.</small>
+        <label for="view-from-preset">Viewing conditions</label>
+        <select id="view-from-preset">
+          <option value="3">Bright night sky (mag 3)</option>
+          <option value="6.5" selected>Very dark night sky (mag 6.5)</option>
+          <option value="9">Binoculars (mag 9)</option>
+          <option value="12">Small telescope (mag 12)</option>
+          <option value="custom">Custom</option>
+        </select>
+        <label for="view-from-magnitude">Limiting magnitude
+          <output id="view-from-magnitude-value" for="view-from-magnitude">6.5</output>
+        </label>
+        <input id="view-from-magnitude" type="range" min="-2" max="15" step="0.1" value="6.5">
+        <p id="view-from-count" role="status" aria-live="polite"></p>
+        <small>Approximate: catalogue coverage is incomplete; instrument limits are illustrative.</small>
+        <button id="close-view-from" type="button">Exit viewpoint</button>
+      </div>
+    </section>
     <p id="subspace-selected" hidden></p>
     <table>
       <tr><th id="h-class">Spectral class</th><td id="d-class"></td></tr>
@@ -479,8 +488,10 @@
 
         <section id="guide-view-from">
           <h3><span class="guide-icon">&#10022;</span> View from a star</h3>
-          <p>Select a star, then choose <b>View from</b> in its details. The camera moves to the star's catalogue position;
-            drag to look around and scroll to zoom. Use the limiting-magnitude slider or choose a rough viewing preset.
+          <p>Select a star to open its details panel, then use <b>View from</b> there to place the camera at its catalogue
+            position. The panel also lets you search for a different visible observer star. While viewing from a star,
+            search for another visible star under <b>Point camera at</b> to aim toward it. Drag to look around and
+            scroll to zoom. Use the limiting-magnitude slider or choose a rough viewing preset.
             The selected star itself is omitted because the viewpoint is at its location. Choose <b>Exit</b> to return
             to your previous map view.</p>
           <p>This is illustrative, not an observation-grade sky simulator. It filters catalogue stars using their
