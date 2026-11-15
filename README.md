@@ -26,6 +26,11 @@ The map and planetary systems are loaded from the active standalone SQLite datas
 `STAREXPLORER_DATABASE` overrides that order. See [SQLite datasets](docs/DATASETS.md) to import a
 database or clone and activate a different one.
 
+The startup spinner shows loading stages and a progress bar. Download progress reports decoded
+MiB received, with a percentage only when the uncompressed total is known. Star processing reports
+objects completed out of the catalogue total; other stages remain indeterminate. The overlay closes
+after the prepared view has rendered, including any planetary data required by saved settings.
+
 ### Run with Gunicorn on Linux
 
 ```bash

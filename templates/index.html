@@ -17,7 +17,9 @@
 <body>
   <div id="loading-overlay" role="status" aria-live="polite">
     <div class="loading-spinner" aria-hidden="true"></div>
-    <p>Loading StarExplorer…</p>
+    <p id="loading-stage">Preparing catalogue...</p>
+    <progress id="loading-progress" aria-labelledby="loading-stage" aria-describedby="loading-detail"></progress>
+    <p id="loading-detail">Waiting for the server.</p>
   </div>
   <div id="canvas-container"></div>
   <div id="labels"></div>

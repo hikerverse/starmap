@@ -263,6 +263,7 @@ controls.listenToKeyEvents(window); // arrow keys pan
 
 // ---------- Star data (struct-of-arrays for speed) ----------
 let N = 0;
+let starfieldReady = false;
 let records = [];          // original JSON objects
 let systemStarCount = 0;   // prefix with planetary-system rows; Gaia-only rows follow it
 let pos;                   // Float32Array(3N), in the current display frame (see `frame`)
@@ -2165,6 +2166,7 @@ window.addEventListener('resize', () => {
 
 // ---------- Load data & start ----------
 async function init() {
+  updateLoading('Preparing catalogue...', 'Waiting for the server.');
   document.getElementById('centre-info').textContent = 'Loading stars…';
   const prefs = loadPrefs();
   const savedRadius = Number(prefs.loadRadiusPc);
@@ -2184,7 +2186,9 @@ async function init() {
     const error = (await res.json().catch(() => null))?.error;
     throw new Error(error ?? `Failed to load stars (${res.status})`);
   }
-  const db = await res.json();
+  const db = await readCatalogue(res);
+  updateLoading('Loading object overlays...', 'Reading nebulae, galaxies and other objects.');
+  await yieldLoading();
   catalogueFingerprint = db.catalogue_fingerprint;
   records = db.stars.slice();
   const actualLoadRadius = db.load_radius_pc ?? loadRadiusPc;
@@ -2214,6 +2218,8 @@ async function init() {
     milkyWay.setCentre(new THREE.Vector3(galacticCentre.x, galacticCentre.y, galacticCentre.z).applyMatrix3(EQ_TO_GAL));
   }
   N = records.length;
+  updateLoading('Processing stars...', `0 of ${N.toLocaleString()} catalogue objects`, 0, N);
+  await yieldLoading();
   firstSpecial = db.stars.length;
   pos = new Float32Array(3 * N);
   absMag = new Float32Array(N);
@@ -2247,17 +2253,30 @@ async function init() {
     }
     namesLower[i] = (kind[i] === KIND_GALAXY && s.ids ? `${s.name} ${s.ids}` : s.name).toLowerCase();
     if (solIndex < 0 && s.x === 0 && s.y === 0 && s.z === 0) solIndex = i;
+    if ((i + 1) % 25000 === 0) {
+      updateLoading('Processing stars...', `${(i + 1).toLocaleString()} of ${N.toLocaleString()} catalogue objects`, i + 1, N);
+      await yieldLoading();
+    }
   }
+  updateLoading('Processing stars...', `${N.toLocaleString()} of ${N.toLocaleString()} catalogue objects`, N, N);
+  await yieldLoading();
+  updateLoading('Loading catalogue groups...', 'Applying sovereignty data.');
   await loadSovereignties(sovResponse);
+  updateLoading('Building starfield...', 'Preparing star graphics.');
+  await yieldLoading();
   buildClassFilter();
   buildNebulaFilter();
   buildPoints();
+  updateLoading('Building starfield...', 'Preparing nebula graphics.');
+  await yieldLoading();
   buildNebulae();
   filterBuilder = createFilterBuilder({
     records, firstSpecial, solIndex, sovereignties, spectralClasses: SPEC_CLASSES,
     planetCategories: PLANET_CATS, onApply: applyAdvancedFilter,
   });
   computeBounds();
+  updateLoading('Restoring view...', 'Applying saved camera and display settings.');
+  await yieldLoading();
   const starCount = `${db.stars.length.toLocaleString()} stars`;
   const gaiaCount = db.gaia_star_count > 0 ? `${db.gaia_star_count.toLocaleString()} Gaia DR3 additions` : null;
   document.getElementById('star-count').textContent =
@@ -2272,6 +2291,10 @@ async function init() {
   }
   renderList();
   refreshViewFromResults();
+  starfieldReady = true;
+  if (pendingFilterText || pendingColourMode) {
+    updateLoading('Loading planetary systems...', 'Waiting for data needed by your saved view.');
+  }
   loadDataset();
   // Saved state that needs the planets dataset keeps the overlay up until loadDataset settles
   if (!pendingFilterText && !pendingColourMode) finishLoading();
@@ -2279,12 +2302,75 @@ async function init() {
 
 // ---------- Loading overlay ----------
 const loadingOverlay = document.getElementById('loading-overlay');
+const loadingStage = document.getElementById('loading-stage');
+const loadingDetail = document.getElementById('loading-detail');
+const loadingProgress = document.getElementById('loading-progress');
+let loadingFinishing = false;
+
+function updateLoading(stage, detail, value, total) {
+  if (loadingFinishing || loadingOverlay.classList.contains('fade-out')) return;
+  loadingStage.textContent = stage;
+  loadingDetail.textContent = detail;
+  if (Number.isFinite(total) && total > 0) {
+    loadingProgress.max = total;
+    loadingProgress.value = value;
+  } else {
+    loadingProgress.removeAttribute('value');
+  }
+}
+
+function yieldLoading() {
+  return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+}
+
+async function readCatalogue(response) {
+  // Fetch streams are decoded by the browser; compressed Content-Length is not their total.
+  const encoding = response.headers.get('content-encoding');
+  const length = Number(response.headers.get('content-length'));
+  const total = !encoding || encoding === 'identity' ? length : 0;
+  updateLoading('Downloading stars...', 'Receiving catalogue data.', 0, total);
+  const chunks = [];
+  let received = 0;
+  let lastUpdate = 0;
+  const reader = response.body?.getReader();
+  let text;
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.byteLength;
+        if (performance.now() - lastUpdate >= 100) {
+          const size = (received / (1024 * 1024)).toFixed(1);
+          const detail = total > 0
+            ? `${size} of ${(total / (1024 * 1024)).toFixed(1)} MiB (${Math.min(100, Math.floor(100 * received / total))}%)`
+            : `${size} MiB received (decoded data; total size unknown)`;
+          updateLoading('Downloading stars...', detail, received, total);
+          lastUpdate = performance.now();
+          await yieldLoading();
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    updateLoading('Reading star catalogue...', 'Decoding catalogue JSON.');
+    await yieldLoading();
+    text = await new Blob(chunks).text();
+    chunks.length = 0;
+  } else {
+    text = await response.text();
+  }
+  updateLoading('Reading star catalogue...', 'Decoding catalogue JSON.');
+  await yieldLoading();
+  return JSON.parse(text);
+}
 
 // Fades out the start-up overlay once the saved view has been fully applied; safe to call repeatedly
 function finishLoading() {
-  if (loadingOverlay.classList.contains('fade-out')) return;
-  loadingOverlay.classList.add('fade-out');
-  setTimeout(() => loadingOverlay.remove(), 400);
+  if (loadingFinishing || loadingOverlay.classList.contains('fade-out')) return;
+  updateLoading('Rendering starfield...', 'Preparing the first frame of your view.');
+  loadingFinishing = true;
 }
 
 // ---------- Saved settings (localStorage) ----------
@@ -2999,6 +3085,7 @@ function updateCameraInfo() {
 
 function loop(now) {
   requestAnimationFrame(loop);
+  if (!starfieldReady) return;
   stepAnimation(now);
   if (viewFromIndex < 0) controls.update();
   updateGrid();
@@ -3011,11 +3098,23 @@ function loop(now) {
   milkyWay.update(camera, displayToGalactic, camera.position.distanceTo(controls.target), milkyWayToggle.checked);
   subspace.update(camera, displayToGalactic);
   renderer.render(scene, camera);
+  if (loadingFinishing && !loadingOverlay.classList.contains('fade-out')) {
+    loadingStage.textContent = 'Starfield ready';
+    loadingDetail.textContent = `${N.toLocaleString()} catalogue objects loaded.`;
+    loadingProgress.max = 1;
+    loadingProgress.value = 1;
+    loadingOverlay.classList.add('fade-out');
+    setTimeout(() => loadingOverlay.remove(), 400);
+  }
 }
 
 init().catch((err) => {
   console.error(err);
   document.getElementById('centre-info').textContent = `Error: ${err.message}`;
-  finishLoading();
+  loadingStage.textContent = 'Loading failed';
+  loadingDetail.textContent = err.message;
+  loadingProgress.removeAttribute('value');
+  loadingOverlay.classList.add('fade-out');
+  setTimeout(() => loadingOverlay.remove(), 400);
 });
 requestAnimationFrame(loop);

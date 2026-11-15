@@ -17,6 +17,9 @@ html, body {
   transition: opacity 0.35s ease;
 }
 #loading-overlay.fade-out { opacity: 0; pointer-events: none; }
+#loading-overlay p { margin: 0; text-align: center; padding: 0 16px; }
+#loading-progress { width: min(320px, calc(100vw - 48px)); height: 12px; accent-color: #8fb4ff; }
+#loading-detail { color: #aebbdc; font-size: 12px; }
 .loading-spinner {
   width: 36px; height: 36px; border-radius: 50%;
   border: 3px solid #3b4f8f; border-top-color: #dde6ff;
