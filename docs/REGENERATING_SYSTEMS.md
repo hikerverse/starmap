@@ -3,7 +3,7 @@
 This guide explains how StarExplorer's planetary systems are produced and how to rebuild them. Examples
 include refreshing the confirmed exoplanets, re-importing the star catalogue and rolling a different
 simulated galaxy. For how the simulation works, see the
-[Planetary systems](../README.md#planetary-systems) section of the README.
+[Planetary systems](../USER_GUIDE.md#planetary-systems) section of the user guide.
 
 ## What is stored and what is generated
 

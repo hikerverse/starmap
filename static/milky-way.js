@@ -43,16 +43,26 @@ const DISK_FRAGMENT = /* glsl */`
     float spiral = 0.0, armHaze = 0.0, dust = 0.0;
     for (int i = 0; i < 6; i++) {
       vec4 shape = uArmShape[i], extent = uArmExtent[i];
-      float pitch = beta <= shape.x ? shape.z : shape.w;
-      float armRadius = shape.y * exp(-(beta - shape.x) * tan(pitch)) * uRadiusScale;
-      float width = max(0.06, extent.z + 0.042 * (armRadius / uRadiusScale - shape.y)) * uRadiusScale;
-      float distance = (radius - armRadius) * cos(pitch);
-      // Only a short, fading extension outside the parallax coverage; never wrap arms around the far side.
-      float coverage = smoothstep(extent.x - extent.w, extent.x, beta)
-        * (1.0 - smoothstep(extent.y, extent.y + extent.w, beta));
-      spiral = max(spiral, exp(-0.5 * pow(distance / width, 2.0)) * coverage);
-      armHaze = max(armHaze, exp(-0.5 * pow(distance / (width * 1.8), 2.0)) * coverage);
-      dust = max(dust, exp(-0.5 * pow((distance - width * 0.65) / (width * 0.22), 2.0)) * coverage);
+      for (int turn = -1; turn <= 1; turn++) {
+        float angle = beta + float(turn) * 6.2831853;
+        float measuredAngle = clamp(angle, extent.x, extent.y);
+        float pitch = measuredAngle <= shape.x ? shape.z : shape.w;
+        float armRadius = shape.y * exp(-(measuredAngle - shape.x) * tan(pitch));
+        // Preserve nearby fitted paths; continue the unmeasured arms with an illustrative trailing spiral.
+        float extensionPitch = 0.30;
+        armRadius *= exp(-(angle - measuredAngle) * tan(extensionPitch)) * uRadiusScale;
+        float width = max(0.18, extent.z * 0.85 + 0.025 * armRadius) * uRadiusScale;
+        float distance = (radius - armRadius) * cos(pitch);
+        float coverage = smoothstep(2.1, 3.4, armRadius) * (1.0 - smoothstep(12.5, 14.8, armRadius));
+        if (i == 3) {
+          coverage *= smoothstep(extent.x - extent.w, extent.x, angle)
+            * (1.0 - smoothstep(extent.y, extent.y + extent.w, angle));
+        }
+        float structure = 0.65 + 0.65 * clouds(p * 4.5 + float(i) * 13.0);
+        spiral = max(spiral, exp(-0.5 * pow(distance / width, 2.0)) * coverage * structure);
+        armHaze = max(armHaze, exp(-0.5 * pow(distance / (width * 2.3), 2.0)) * coverage);
+        dust = max(dust, exp(-0.5 * pow((distance - width * 0.55) / (width * 0.28), 2.0)) * coverage);
+      }
     }
     dust *= smoothstep(0.3, 0.65, cloud);
     float edge = 1.0 - smoothstep(11.0, 15.0, radius + (cloud - 0.5) * 0.8);
@@ -60,9 +70,9 @@ const DISK_FRAGMENT = /* glsl */`
     float clumps = smoothstep(0.38, 0.76, cloud);
     float stars = pow(noise(p * 65.0), 12.0) * 5.0;
     float gas = spiral * smoothstep(0.50, 0.68, clouds(p * 6.0 + 41.0));
-    float density = disk * (0.12 + 0.24 * armHaze + spiral * (0.55 + 1.4 * clumps)
+    float density = disk * (0.07 + 0.35 * armHaze + spiral * (0.8 + 1.8 * clumps)
       + stars * (0.12 + spiral * 0.9)) * (1.0 - 0.82 * dust);
-    vec3 tint = mix(vec3(0.40, 0.43, 0.57), vec3(0.73, 0.80, 1.0),
+    vec3 tint = mix(vec3(0.30, 0.34, 0.48), vec3(0.72, 0.84, 1.0),
       clamp(spiral * (0.45 + clumps) + stars, 0.0, 1.0));
     tint = mix(tint, vec3(1.0, 0.34, 0.51), clamp(gas * 1.4, 0.0, 0.65));
     tint *= 0.85 + 0.3 * fine;

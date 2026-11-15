@@ -1,17 +1,16 @@
-﻿# StarExplorer
+# StarExplorer: installation and operation
 
-A Flask web app with a three.js front end that renders an interactive 3D map of stars.
-It ships with ~107,000 stars from the HYG catalogue (everything within ~1 kpc that has a distance and
-spectral class).
+StarExplorer is a Flask web app with a Three.js front end for exploring stars, nebulae,
+compact objects and galaxies.
 
-Three.js 0.160.0 and its OrbitControls add-on are served locally from `static/vendor/three`;
-the included license is in that directory. The browser does not need to fetch Three.js from a CDN.
+**For what the app does, how to use it, data sources, rendering techniques and scientific
+limitations, see the [user guide, data and methods](USER_GUIDE.md).**
 
-## Run
+## Install and run locally
 
-The ignored SQLite dataset is not included in Git. Restore `data\stars.sqlite` from a backup, create
-one from the source data, or convert a matching legacy full snapshot using
-[SQLite datasets](docs/DATASETS.md) before starting the app.
+Run commands from the project directory. The ignored SQLite dataset is not included in Git.
+Restore `data\stars.sqlite` from a backup, create one from the source data, or convert a matching
+legacy full snapshot using [SQLite datasets](docs/DATASETS.md) before starting the app.
 
 ```powershell
 py -3.13 -m venv .venv
@@ -20,21 +19,34 @@ py -3.13 -m venv .venv
 $env:PORT=5057; .\.venv\Scripts\python app.py   # use another port if 5001 is busy
 ```
 
-Use the top menu's **Catalogue** item to choose HYG, GAIA, or Both and the load radius from Sol
-(1, 2, or 5 kpc), then select **Reload catalogue**. These selections are saved.
+Three.js 0.160.0 and OrbitControls are served locally from `static/vendor/three`;
+the included license is in that directory. The browser does not fetch Three.js from a CDN.
 
-The map and planetary systems are loaded from the active standalone SQLite dataset. The app prefers
-`data/stars-gaia-temperatures.sqlite`, then `data/stars-gaia-nearby.sqlite`, then `data/stars-gaia-expanded.sqlite`, then
-`data/stars-gaia-enriched.sqlite`, then `data/stars.sqlite`;
-`STAREXPLORER_DATABASE` overrides that order. See [SQLite datasets](docs/DATASETS.md) to import a
-database or clone and activate a different one.
+## Select the active database
 
-The startup spinner shows loading stages and a progress bar. Download progress reports decoded
-MiB received, with a percentage only when the uncompressed total is known. Star processing reports
-objects completed out of the catalogue total; other stages remain indeterminate. The overlay closes
-after the prepared view has rendered, including any planetary data required by saved settings.
+The map and planetary systems are loaded from the active standalone SQLite dataset.
+The app prefers, in order:
 
-### Run with Gunicorn on Linux
+1. `data/stars-gaia-temperatures.sqlite`
+2. `data/stars-gaia-nearby.sqlite`
+3. `data/stars-gaia-expanded.sqlite`
+4. `data/stars-gaia-enriched.sqlite`
+5. `data/stars.sqlite`
+
+`STAREXPLORER_DATABASE` overrides this order:
+
+```powershell
+$env:STAREXPLORER_DATABASE = "data\stars-gaia-enriched.sqlite"
+.\.venv\Scripts\python app.py
+```
+
+This backend setting chooses the database for all clients. The browser's **Catalogue** menu
+selects HYG, GAIA or Both and a 1, 2 or 5 kpc star sample within it; it does not choose a
+different database. Larger selections require more memory.
+Missing or invalid databases produce an explicit error, not request-time regeneration.
+See [SQLite datasets](docs/DATASETS.md) for conversion, cloning, SQL queries and editing.
+
+## Run with Gunicorn on Linux
 
 ```bash
 python3 -m venv .venv
@@ -42,22 +54,20 @@ python3 -m venv .venv
 .venv/bin/gunicorn --no-control-socket --bind 127.0.0.1:8000 app:app
 ```
 
-Run these commands from the project directory. Gunicorn serves the app at
-`http://127.0.0.1:8000` without Flask's development server. It stays in the foreground;
-use a service manager for automatic startup. Apache needs a reverse proxy configuration
-to serve this app through port 80. Gunicorn is not installed on Windows.
-The optional Gunicorn control socket is disabled to avoid runtime-directory
-permission errors.
+Gunicorn serves the app at `http://127.0.0.1:8000` without Flask's development server.
+It stays in the foreground; use a service manager for automatic startup.
+Apache needs a reverse proxy configuration to serve the app through port 80.
+Gunicorn is not installed on Windows. The optional control socket is disabled to avoid
+runtime-directory permission errors.
 
 ### Run Gunicorn as a systemd service
 
-`deploy/starmap.service` runs Gunicorn as `simon` from `/home/simon/starmap`, starts
-at boot, and restarts on failure. Update its user, group and paths if installing
-elsewhere. Stop any manually started Gunicorn instance first (Ctrl+C in its terminal)
-so port 8000 is free.
+`deploy/starmap.service` runs Gunicorn as `simon` from `/home/simon/starmap`, starts at boot,
+and restarts on failure. Update its user, group and paths if installing elsewhere.
+Stop any manually started Gunicorn instance first (Ctrl+C in its terminal) so port 8000 is free.
 
-Run these commands from the project directory in a regular terminal where `sudo`
-can prompt for your password:
+Run these commands from the project directory in a regular terminal where `sudo` can prompt
+for your password:
 
 ```bash
 sudo install -m 644 deploy/starmap.service /etc/systemd/system/starmap.service
@@ -67,17 +77,17 @@ sudo systemctl status starmap.service --no-pager
 curl -I http://127.0.0.1:8000/
 ```
 
-View logs with `sudo journalctl -u starmap.service -f`. After updating the app,
-run `sudo systemctl restart starmap.service`. Apache can continue proxying to
-`127.0.0.1:8000` without configuration changes.
+View logs with `sudo journalctl -u starmap.service -f`. After updating the app, run
+`sudo systemctl restart starmap.service`. Apache can continue proxying to `127.0.0.1:8000`
+without configuration changes.
 
 ### Apache HTTPS reverse proxy
 
 `deploy/hikerverse.org.conf` serves `https://hikerverse.org` through Gunicorn at
 `127.0.0.1:8000` and redirects HTTP to HTTPS. It expects a valid certificate and key at
 `/etc/letsencrypt/live/hikerverse.org/fullchain.pem` and
-`/etc/letsencrypt/live/hikerverse.org/privkey.pem`. Obtain the certificate before
-enabling this site, or edit those paths to use your existing certificate.
+`/etc/letsencrypt/live/hikerverse.org/privkey.pem`. Obtain the certificate before enabling
+this site, or edit those paths to use your existing certificate.
 
 On Ubuntu, with Gunicorn running:
 
@@ -92,607 +102,120 @@ curl -I https://hikerverse.org/
 Point the domain's DNS records at this server and allow inbound ports 80 and 443.
 The configuration covers `hikerverse.org`, not `www.hikerverse.org`.
 
-## Controls
+## Data preparation and maintenance
 
-**Help → About StarExplorer & methods** opens a draggable, resizable in-app window like the user
-guide. Close it with **Close** or Escape without disturbing the map. It describes the tool,
-astronomical data sources, statistical planet generation,
-SQLite datasets, provenance and scientific limitations. The existing **User guide**
-remains the step-by-step reference for controls. A standalone `/about` page is also available.
+The following commands are for operators, not required for ordinary browsing.
+Selection criteria, provenance, attribution and scientific caveats are in the
+[user guide's data sections](USER_GUIDE.md#data-sources-and-how-they-are-used).
+Do not overwrite or experiment on the active database; clone it first.
+Editing an import-source JSON file alone does not update the SQLite-backed running map.
 
-### Subspace disturbance
-
-Open **View → Subspace disturbance...** for a separate, draggable settings window, then enable
-**Show subspace disturbance** for an illustrative, static volumetric field
-within 1,200 pc of Sol. Domain-warped filaments run through a weak background, with cores typically
-a few parsecs across. This is fictional spatial data, independent of the astronomical catalogue and
-planetary data; it does not change object visibility, picking or filters.
-The window is non-blocking so you can navigate the map while adjusting it. **Close** or Escape
-closes the window without disabling the layer or discarding settings.
-
-**Glow** adjusts the presentation only. The **Seed** (an unsigned 32-bit integer) determines the field;
-**Regenerate** picks a new seed. The seed, generation version (currently 1), glow and visibility are
-saved with browser settings. Share the seed and generation version to reproduce the same field.
-Galactic/Equatorial frame changes preserve its alignment with the stars.
-
-The map displays accumulated disturbance along each line of sight, not a local percentage.
-Separate **Local disturbance** readings show the actual field strength at the camera and selected
-object, or indicate positions outside the mapped field. Glow does not affect these readings.
-
-The volume uses a cached, reduced-resolution ray-marched image (lower resolution on phones), with
-distance-filtered strands to limit aliasing. Fine strands blend together at survey-wide zoom levels;
-zoom in to inspect them. The layer does not render when disabled or when Glow is zero.
-
-Run the dependency-free field regression tests with Node.js 22+:
-
-```powershell
-node --experimental-default-type=module tests\test_subspace.mjs
-```
-
-### Primitive shapes
-
-Open **View → Primitive shapes...** for a draggable, resizable, non-blocking annotation window.
-Add spheres/ellipsoids, boxes, cylinders, cones, rings/toruses or XY planes. Set full X/Y/Z dimensions
-in parsecs (diameters for spheres), colour, transparency from 0% opaque to 100% invisible,
-wireframe, rotation and an optional label. Planes ignore Z height.
-
-Centres and rotations use **Galactic coordinates**, in parsecs from Sol, even in Equatorial view.
-Enter coordinates directly, choose an exact catalogue object name, or select an object on the map
-or star list and press **Use selected object**. These buttons copy a fixed centre; later object
-selections do not move the annotation. Press **Add shape** or **Save changes** to apply.
-
-Choose a saved shape to edit it or use **Delete shape**. Close or Escape dismisses the window
-without removing shapes. Annotations stay aligned across frame changes, are independent of catalogue
-filters and do not intercept object picking. The **Labels** toggle also hides annotation labels.
-Shapes are saved automatically in this browser; **Clear saved data...** removes them too.
-
-Run the dependency-free validation tests with Node.js 22+:
-
-```powershell
-node --experimental-default-type=module tests\test_primitive_shapes.mjs
-```
-
-### Navigation
-
-On tablets and phones (up to 1024 px wide), **Controls** opens a collapsible display-controls panel.
-Tap **Close** or the map to dismiss it. Object details, search, filters, planetary systems and the user
-guide fit the smaller viewport; long panels scroll, and planetary tables scroll horizontally.
-With a touchscreen, drag with one finger to rotate, pinch to zoom, and move two fingers to pan.
-Tap an object for details, then use **Centre on object** to fly to it without needing a double-click.
-
-| Action | Effect |
-| --- | --- |
-| Left-drag | Rotate around the current centre |
-| Right-drag / Shift+drag / arrow keys | Pan |
-| Scroll wheel | Zoom |
-| Click a star (or list entry) | Show star details |
-| Double-click a star (or list entry) | Centre on it and move the camera to 3 pc away, keeping the viewing direction |
-| Reset view | Centre on Sol, 12 pc away |
-| Show all | Zoom out to fit every star |
-| Esc | Close details |
-| ? | Open the user guide (also **Help → User guide**); drag its header to move it, its corner to resize it |
-
-Star size and brightness follow each star's apparent magnitude as seen from the camera, so the
-neighbourhood around the camera looks right at any zoom level. Labels are decluttered automatically:
-the selected/centre star first, then stars near the rotation centre, then the brightest (named stars
-ahead of catalogue ids). Zoom in to reveal more. The grid rescales with zoom (spacing shown bottom-centre).
-
-The star details panel shows mass (M☉) and bolometric luminosity (L☉), fetched on selection.
-Stored stellar parameters are reused; derived values are marked **(est.)** with their source.
-Gaia-only stars use the existing spectral-type/absolute-magnitude model, not measured masses.
-Missing parameters are shown as unavailable.
-
-Select a star to open its details panel, then use **View from** there to place the camera at that
-star and explore the surrounding sky. The details panel also lets you search for a different visible
-observer star. While viewing from a star, search for another visible star under **Point camera at**
-to aim toward it. Drag to look around, scroll to zoom, and adjust the limiting apparent magnitude or
-choose an illustrative dark-sky, binocular or small-telescope preset. The observer star is omitted
-from the view. This is only an approximation: the catalogue is incomplete, some magnitudes and
-distances are estimated, and equipment presets do not simulate optics, sky brightness or dark
-adaptation. Choose **Exit viewpoint** to restore the previous map view.
-
-Open **View → Star list** to show a floating, draggable panel listing the 25 stars nearest the rotation
-centre; type in its search box to find stars by name. Click an entry to select it, double-click to fly to
-it. Drag the panel by its title; close it with **×**, the menu item again, or Escape (the first Escape
-clears a search). The list is only recomputed while the panel is open.
-
-### Saved settings
-
-StarExplorer remembers your session in this browser (`localStorage`, key `starexplorer:prefs:v1`):
-the applied advanced filter, frame, colour mode, sidebar toggles and class / type chips,
-sovereignty and planet legend toggles, the quick distance filter, the camera and rotation-centre star,
-and whether the star list is open and where. Changes are saved automatically (debounced) and restored
-on the next visit. Filters and the Planets colour mode wait for the active dataset before they are
-reapplied. Stars and sovereignties are stored by name, and anything invalid or no longer present is
-ignored rather than blocking start-up. **View → Clear saved data...** forgets everything and reloads
-with the defaults. Nothing is sent to the server, and if browser storage is disabled the app simply
-starts with defaults each time.
-
-### Advanced filters
-
-Open **View → Filters...** in the top menu to build a set of conditions. The builder is hidden until
-opened; **Reset view** and **Show all** are also in the View menu.
-
-- **ALL (AND)** requires every condition to match. For example, within 10 pc of Star X AND within 15 pc
-  of Star Y shows the overlap of the two spheres.
-- **ANY (OR)** accepts either condition. Use it for separate neighbourhoods, for example within 10 pc
-  of Sol OR within 10 pc of Vega, even when the spheres do not overlap. Add nested groups to combine AND and OR.
-- **NOT** excludes matches to a condition or a whole group.
-- Conditions support distance from a reference star, object type, spectral class, sovereignty,
-  planetary category and confirmed planets. Planetary conditions use the active dataset even when
-  the map is not coloured by planets; spectral, sovereignty and planet conditions match stars only
-  before NOT is applied.
-
-Reference-star search uses the whole star catalogue, including hidden stars. Choose a result from
-the reference-star selector; typing a search alone does not change the centre. Each distance rule
-shows its chosen centre, which stays fixed when selecting or centring other stars.
-Distances are in parsecs and include the boundary (zero matches coincident positions). They are
-evaluated in the original catalogue coordinates, so switching display frames cannot change the result.
-Galaxies remain an unfiltered backdrop unless **Apply advanced filters to galaxies too** is checked.
-
-The filter builder is a non-blocking floating panel: drag its title to move it while continuing to
-navigate and select stars on the map. **Apply** activates the rules and leaves the panel open for
-further adjustments. **Close** or Escape closes it and discards only unapplied edits; applied filters
-stay active. Opening **View → Filters...** again restores the last applied rules and panel position.
-**Clear rules**, then **Apply**,
-disables advanced filters. Rules last for the current page session. Sidebar visibility controls and
-the existing quick distance filter are additional restrictions, not overridden by the builder.
-The top menu shows the combined visible-object count while advanced filters are active.
-
-To keep a filter across refreshes, open **Save / load filter text** in the panel. **Copy filter text**
-exports the *applied* rules (and the galaxy option) as a compact JSON string and copies it to the
-clipboard; paste it back later and click **Load & apply**. Stars and sovereignties are stored by name,
-so the text stays valid if the catalogue is rebuilt, for example:
-
-```json
-{"starexplorer":1,"galaxies":false,"match":"any","rules":[
-  {"distance":10,"from":"Sol"},{"distance":10,"from":"Deneb"}]}
-```
-
-Rules are `{"match":"all"|"any","rules":[...]}` groups or single conditions:
-`{"distance":pc,"from":"star name"}`, `{"kind":"Star"}`, `{"spectral":"G"}`,
-`{"sovereignty":"name"}` (`null` = unclaimed), `{"planet":"Potentially habitable"}` and
-`{"confirmed":true}`. Add `"not":true` to any rule or group to negate it. The optional `index` saved
-with distance rules is only a hint; the star name is authoritative, matched case-insensitively.
-
-Filter results are cached per object and uploaded as a GPU visibility attribute. Complex expressions
-are evaluated only when applied or when the active dataset changes, not during camera movement.
-Picking, labels, search, the nearest list and nebula clouds all use the same cached result.
-
-The dependency-free filter-engine tests can be run with Node.js 22+:
-
-```powershell
-node --experimental-default-type=module tests\test_filters.mjs
-```
-
-The **Frame** selector chooses the display coordinate system. A fixed-size orientation widget below the
-sidebar in the lower-left corner shows the red X, green Y and blue Z axes and a direction legend.
-It rotates with the camera, but stays fixed when panning or zooming. The axes are not drawn over the star
-field. The widget remains visible when **Grid & drop lines** is switched off.
-The grid lies on the frame's z = 0 plane:
-
-The **XY**, **XZ** and **YZ** buttons beside the orientation axes snap the camera to face that plane
-in the selected frame, preserving the current rotation centre and camera distance. XY looks from +Z,
-XZ from -Y and YZ from +X. These are axis-aligned camera views; the perspective projection is unchanged.
-
-- **Galactic** (default): right-handed. +X points to the Galactic Centre (l = 0°, b = 0°), +Y to l = 90°
-  (the direction of Galactic rotation) and +Z to the North Galactic Pole. The grid is the Galactic plane.
-- **Equatorial (J2000)**: the frame the JSON files are stored in. +X points to RA 0h, +Y to RA 6h and +Z to
-  the North Celestial Pole.
-
-Positions are converted in the browser with the Hipparcos equatorial-to-galactic rotation matrix. The details
-panel shows X/Y/Z in the current frame plus galactic longitude and latitude (l, b).
-
-The bottom-centre panel shows the camera's live position in galactic coordinates (X, Y, Z in parsecs and
-l, b, with Sol at the origin) in either frame. It also shows how far the camera is from the selected object,
-or from the rotation centre when nothing is selected. That distance is shown in AU, pc (with light years)
-or kpc, depending on scale.
-
-Single-clicking a star also shows **selected star to rotation-centre star** in the bottom-centre
-panel, separately from the camera distance. The details panel shows the same separation under
-**Distance from centre**. This uses the centre star's position even during a camera move.
-After panning away from a star, the separation is measured to the free view centre instead.
-Clearing the selection hides this readout.
-
-Type a distance in parsecs into **Show within … pc** to only show objects (stars, neutron stars and black
-holes) within that distance of the selected star. With nothing selected, the sphere is centred on the
-rotation centre (Sol by default). Clicking another star moves the sphere to it. Clear the box to show
-everything again. Picking, labels, the nearest list and search all respect the filter.
-
-Neutron stars are drawn as violet "pulsar" glyphs (a core, a ring and a cross) at a fixed minimum size,
-always labelled, and listed with a diamond swatch. The **Stars**, **Neutron stars** and **Black holes** checkboxes
-hide or show each kind of object.
-
-Under the **Stars** checkbox, the spectral-class chips (**O B A F G K M Other**) filter stars by their main
-spectral class. Click a chip to show or hide that class, double-click it to show only that class, or click
-**All** to reset. Hover over a chip to see how many stars it holds. The class is the first letter of the HYG
-spectral type. Luminosity prefixes (`dM4`, `sdF8`, `gK0`) and lower-case types (`m`, `k-m`) are mapped to
-their main class. White dwarfs (D), carbon stars (C/R/N/S), Wolf-Rayet stars (W) and unclassified stars count
-as **Other**. The chips do not affect neutron stars or black holes, and they combine with the distance and
-sovereignty filters.
-
-Black holes are drawn as orange glyphs (a dark centre, a photon ring and a tilted accretion disc), always
-labelled, and listed with a ring swatch. Use the **Black holes** checkbox to hide or show them. Most lie well
-beyond the HYG stars (up to ~8.6 kpc), so zoom out or double-click one in the list to fly to it. **Show all**
-still fits the HYG stars only.
-
-Nebulae are drawn as soft, noise-textured glows sized to their physical radius, plus a dashed-ring marker
-(❋) for picking. Emission nebulae glow, supernova remnants are faint broken shells of thin wispy filaments,
-planetary nebulae show uneven nested shells, filament detail and faint outer halos, with blue-green
-inner gas and reddish rims. Catalogue morphology selects round, elliptical, bipolar or irregular
-shapes; unclassified objects get a stable procedural mix. Dark clouds dim the stars behind them.
-Use the **Nebulae** checkbox to hide or show them all. The
-type chips (**Emission, Reflection, Planetary, SNR, Dark**) work like the spectral-class chips: click to
-toggle, double-click to show only that type. Nebulae are searchable, show up in the nearest list and respect
-the distance filter. The details panel shows catalogue IDs, size and the distance source.
-
-**Milky Way** (above Extragalactic, enabled by default) adds a translucent, procedural spiral disk,
-central bar/bulge and faint halo. Mottled blue-white arms include dark dust lanes,
-stellar flecks and pink star-forming clouds; these details are baked once into a procedural texture
-and viewed through a thin 3D disk. Its centre follows the catalogue position of **Sagittarius A***,
-about 8,178 pc from Sol; if that overlay is unavailable it uses the approximate Galactic Centre
-on the +X axis. The disk lies in the galactic plane, extends to about 15,000 pc in radius, and
-stays aligned when changing coordinate frames. It fades in as the camera-to-view-centre distance
-increases from 500 to 6,000 pc, so local views are unchanged. Zoom out with the wheel to see the
-local catalogue in context; **Show all** still fits the star catalogue only.
-Arm centre-lines follow the parallax-based, kinked logarithmic fits from
-[Reid et al. (2019), Table 2 and Section III](https://arxiv.org/html/1910.03357v1#A2.T2):
-Norma, Scutum-Centaurus, Sagittarius-Carina, Local (Orion), Perseus and Outer.
-Azimuth is zero from the centre towards Sol, increasing in the direction of Galactic rotation.
-The fits' 8.15 kpc solar radius is scaled to the catalogue's centre-to-Sol distance; star positions
-are not moved. At Sol's azimuth, Sagittarius lies inward, Perseus outward, and Sol is within
-the broad Local Arm region, not forced onto its centre-line.
-The published Gaussian widths and their 42 pc/kpc radial gradient set the bands.
-Segments taper outside their measured azimuth ranges over 15 degrees (5 for the Local Arm).
-The largely unmeasured far side stays diffuse, rather than being filled with invented arm paths.
-This is an observationally anchored model, not a definitive arm-membership map: the fits have
-uncertainties, track young star-forming regions rather than all stellar populations, and do not
-include a disk warp. Cloud knots, dust, stellar flecks, disk thickness, bar and halo remain illustrative.
-This backdrop does not affect picking, filters or colour modes, and its checkbox is saved with
-the other browser settings. It renders at reduced resolution and is cached while the camera is still.
-
-**Extragalactic ⬭** toggles 52 well-known galaxies and galaxy clusters, from the Magellanic Clouds out to
-3C 273 (~650 Mpc). They are drawn as tilted elliptical glows at their real distances, so zoom far out to
-see them. Click one (or search by name or catalogue ID, e.g. `M31`, `Whirlpool`) for details. They are a
-distant backdrop: double-clicking one selects it but never makes it the centre of rotation, and the
-distance filter does not hide them.
-
-**Colour by** switches between the stars' own colours and **Sovereignty**. In sovereignty mode each member
-star takes its sovereignty's colour, is drawn at least 10 px wide and is preferred for labelling. Unclaimed
-stars turn grey. A legend lists each sovereignty with its member count: click a name to fit the view to its
-members, use its checkbox to hide or show it, and untick **Unclaimed stars** to show members only. The
-details panel shows a star's sovereignty in either colour mode.
-
-**Colour by → Planets** colours every star by its planetary system:
-
-| Colour | Category |
-| --- | --- |
-| Grey | No planets |
-| Blue | Planets, none in the habitable zone |
-| Amber | A planet in the habitable zone (e.g. a gas giant or a mini-Neptune) |
-| Green | Potentially habitable: a rocky planet in the habitable zone of a suitable star |
-
-Each legend entry has a checkbox. **Confirmed planets only** restricts the map to systems marked as
-observed in the active dataset. The backend selects the dataset; restart it and reload the page to
-switch populations. The details panel summarises the system. **View system** opens a panel with stellar data,
-the habitable zone (conservative band in green, optimistic margins in amber), the snow line, a log-scale
-orbit diagram and a planet table. Click a planet row or dot to expand its description and moons. The
-Drag the panel's title to move it around the screen. The panel follows the selection, and Esc closes it.
-
-## Star database
-
-Stars live in [data/stars.json](data/stars.json) (one star per line). Each entry has:
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `name` | string | |
-| `x`, `y`, `z` | number | Position in parsecs (equatorial J2000, Z towards the north celestial pole, Sol at the origin) |
-| `colour` | string | Hex colour, e.g. `#ffd2a1` |
-| `spectral_class` | string | e.g. `G2V` |
-| `abs_mag` | number | Optional absolute visual magnitude (used for size/brightness; defaults to 5) |
-
-This JSON is an import source. The app serves the star catalogue from the active SQLite dataset.
-Editing this file alone does not change the running map; convert or update a database and activate it
-as described in [SQLite datasets](docs/DATASETS.md).
-
-The first 10 stars were entered by hand; the rest come from the
-[HYG Database v4.0](https://github.com/astronexus/HYG-Database) by David Nash, licensed
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). They were imported with:
+### HYG star import
 
 ```powershell
 .\.venv\Scripts\python tools\import_hyg.py all   # every usable star
-.\.venv\Scripts\python tools\import_hyg.py 100   # or just the next 100 nearest
+.\.venv\Scripts\python tools\import_hyg.py 100   # or the next 100 nearest
 ```
 
-The importer keeps existing entries, skips rows without a valid distance or spectral class, and skips close
-binary companions within 0.05 pc of an included star (e.g. Sirius B), since they would sit on the same point.
-Colours are derived from each star's B-V colour index. Names fall back to Bayer/Flamsteed, Gliese, HD, HIP or
-HR designations.
+This updates `data/stars.json`, an import source. Convert or update a database and activate
+it using [SQLite datasets](docs/DATASETS.md).
+See [HYG processing and limitations](USER_GUIDE.md#star-database).
 
-Caveats: HYG distances come from Hipparcos parallaxes, so they become uncertain beyond a few hundred parsecs
-and a few stars with bad parallaxes appear in odd places. The catalogue is also magnitude-limited, so
-faint stars (most red dwarfs) are missing beyond ~20 pc.
+### Gaia enrichment and additional stars
 
-### Enriching the star database with Gaia DR3
-
-The existing catalogue can be enriched without changing its names, positions, or planetary-system links.
-The offline importer recovers HYG identifiers, uses the Gaia Archive's Hipparcos cross-match where
-unambiguous, and tries a position match for remaining HYG stars after propagating their coordinates
-from J2000 to Gaia's reference epoch. Position matches are accepted only when exactly one Gaia source
-is found within 2 arcseconds; ambiguous and unmatched stars are listed in a CSV report. This radius
-captures 99.8% of the uniquely cross-matched HYG/Hipparcos sources tested against Gaia DR3.
+Enrich HYG entries in a separate database:
 
 ```powershell
 .\.venv\Scripts\python tools\enrich_gaia.py `
   data\stars.sqlite data\stars-gaia-enriched.sqlite
-$env:STAREXPLORER_DATABASE = "data\stars-gaia-enriched.sqlite"
-.\.venv\Scripts\python app.py
 ```
 
-The command requires an internet connection to the [Gaia Archive TAP service](https://gea.esac.esa.int/tap-server/tap)
-and creates a separate database plus `data\stars-gaia-enriched.gaia-report.csv`; it refuses to overwrite
-either output. Gaia values are stored under each star's `gaia_dr3` object in the SQLite `extra` field.
-It includes the source ID, Gaia position, parallax and uncertainty, proper motion and uncertainties,
-G/BP/RP mean magnitudes, RUWE, astrometric solution type, and match provenance. Gaia DR3 source IDs
-are strings so their 64-bit values remain exact in JSON. A successful cross-match does not replace the
-catalogue's original coordinates or distances. See the [Gaia DR3 data model](https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/)
-and [Gaia data credits](https://www.cosmos.esa.int/web/gaia-users/credits) when using the measurements.
-
-### Adding Gaia DR3 stars
-
-The importer adds a separate `gaia_stars` table and does not invent planetary-system rows.
-It downloads sources with nominal parallax distances within 5 kpc, parallax signal-to-noise
-of at least 5, RUWE below 1.4, a five- or six-parameter astrometric solution, and Gaia G magnitude
-10.8 or brighter. These cuts select only a fraction of Gaia. Gaia distances are inverse-parallax
-estimates, and display colours are approximate from BP-RP.
+This requires the [Gaia Archive TAP service](https://gea.esac.esa.int/tap-server/tap),
+creates `data\stars-gaia-enriched.gaia-report.csv` and refuses to overwrite either output.
+Gaia measurements and match provenance are retained without replacing HYG positions.
 
 ```powershell
 .\.venv\Scripts\python tools\import_gaia_stars.py
 .\.venv\Scripts\python tools\import_gaia_stars.py --nearby
-```
-
-The first command copies `data\stars-gaia-enriched.sqlite` to `data\stars-gaia-expanded.sqlite`
-and imports the 1–5 kpc sample. The second copies that database to `data\stars-gaia-nearby.sqlite`
-and adds the sample within 1 kpc. Neither overwrites the source. Each command counts candidates and
-refuses more than 1,000,000 candidates and existing additions in total; use `--max-g-mag` for a
-brighter limit if needed. The app automatically prefers the nearby database when present.
-The saved **Star catalogue** control selects HYG, GAIA, or Both; **Load stars from Sol out to**
-applies a 1, 2, or 5 kpc radius. Reload to apply changes. GAIA includes HYG entries with Gaia
-crossmatches (using their original HYG positions and planetary systems) plus the deduplicated Gaia
-additions; Both also includes HYG entries without a crossmatch. Gaia additions have no planetary
-systems. Other object overlays are controlled separately. Larger selections require more memory.
-
-For map alignment, Gaia positions are propagated from DR3's 2016 reference epoch back to J2000;
-the original Gaia coordinates and proper motions remain in the row's `gaia_dr3` data. The importer
-excludes source IDs already matched to existing stars and probable positional matches within 5
-arcseconds for the remaining unmatched stars. The Gaia Archive may temporarily reject or delay TAP
-queries when its anonymous job queue is busy.
-The importer retries HTTP 429 responses and does not publish a database unless the complete result
-passes validation.
-
-### Estimating Gaia spectral classes
-
-```powershell
 .\.venv\Scripts\python tools\estimate_gaia_spectral.py
 ```
 
-This copies `data\stars-gaia-nearby.sqlite` to a new `data\stars-gaia-temperatures.sqlite` and
-retrieves Gaia DR3 GSP-Phot effective temperatures and their 16th–84th percentile bounds for the
-imported sample. The app prefers this database when present. For Gaia-only additions, an approximate
-O/B/A/F/G/K/M class is assigned using broad main-sequence temperature ranges only when both
-confidence bounds fall in the same range; otherwise it remains Other. Details mark estimates
-**(est.)**. Temperature alone does not determine luminosity class or identify unusual stars, and
-Gaia temperatures can have systematic errors even when the reported bounds are narrow.
-The original temperature and bounds remain in the full catalogue and spatial-query API data.
-HYG classifications are unchanged. Existing databases are not overwritten.
+The first command copies the enriched database to `data\stars-gaia-expanded.sqlite` and imports
+the 1-5 kpc sample. The second copies that database to `data\stars-gaia-nearby.sqlite` and adds
+the sample within 1 kpc. The third creates `data\stars-gaia-temperatures.sqlite` with GSP-Phot
+temperature estimates and inferred spectral classes. Existing databases are not overwritten.
 
-## Neutron star database
+The star importer refuses more than 1,000,000 candidates and existing additions in total;
+use `--max-g-mag` for a brighter limit if needed. It retries HTTP 429 responses and does not
+publish a database unless the complete result passes validation. The archive can temporarily
+reject or delay requests when its anonymous job queue is busy.
+See [Gaia matching](USER_GUIDE.md#enriching-the-star-database-with-gaia-dr3),
+[sample selection](USER_GUIDE.md#adding-gaia-dr3-stars) and
+[spectral estimates](USER_GUIDE.md#estimating-gaia-spectral-classes).
 
-Neutron stars live in [data/neutron_stars.json](data/neutron_stars.json). They use the same fields as the
-star database (`abs_mag` omitted, `spectral_class` is `"Neutron star"`), plus:
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `type` | string | e.g. `Millisecond Pulsar`, `XDINS (Magnificent Seven)` |
-| `constellation` | string | |
-| `notes` | string | |
-| `distance_pc` | number | Distance from Sol used for the position |
-| `ra_deg`, `dec_deg` | number | J2000 sky position used for the position |
-
-Type, constellation and notes appear in the details panel. The file is served at `/api/neutron-stars`.
-
-It is generated from [data/neutron_stars_1000pc.csv](data/neutron_stars_1000pc.csv) (name, type, distance,
-constellation, notes) with:
+### Compact-object and nebula overlays
 
 ```powershell
 .\.venv\Scripts\python tools\import_neutron_stars.py
-```
-
-The CSV has no sky coordinates, so [tools/import_neutron_stars.py](tools/import_neutron_stars.py) holds the J2000
-RA/Dec of each object (SIMBAD / ATNF Pulsar Catalogue) and checks each one against the object's J2000
-designation (e.g. `J1856.5-3754`). For new rows with no entry in that table, it falls back to the position
-encoded in a `J` designation in the name (accurate to ~1 arcminute).
-
-Caveats: the CSV distances are used as given. PSR J1748-2021B sits in the globular cluster NGC 6440, usually
-placed at ~8 kpc rather than 727 pc. Distance estimates for PSR J0952-0607 range from ~1 to ~6 kpc.
-
-## Black hole database
-
-Black holes live in [data/black_holes.json](data/black_holes.json). They use the same fields as the neutron
-star database (`spectral_class` is `"Black hole"`), plus `mass_msun` (mass in solar masses). Mass, type,
-constellation and notes appear in the details panel. The file is served at `/api/black-holes`.
-
-It is generated from [data/black_holes.csv](data/black_holes.csv) (name, type, distance, constellation, mass,
-RA/Dec J2000, notes) with:
-
-```powershell
 .\.venv\Scripts\python tools\import_black_holes.py
-```
-
-The list holds 15 well-established objects: the dormant Gaia black holes (BH1, BH2, BH3), dynamically confirmed
-X-ray binaries (e.g. Cygnus X-1, V404 Cygni, A0620-00, GRS 1915+105) and Sagittarius A*. Values are rounded
-literature values (SIMBAD positions, published distances and masses) and should be treated as approximate.
-
-Caveats: X-ray binary distances are often uncertain. GRO J1655-40 is quoted anywhere from 1.7 to 3.2 kpc, and
-GRS 1124-683 and V4641 Sgr have large uncertainties. Disputed or retracted candidates (LB-1, HR 6819, "The
-Unicorn") are deliberately left out.
-
-## Nebulae
-
-Nebulae live in [data/nebulae.json](data/nebulae.json) (under a `nebulae` key) and are served at
-`/api/nebulae`. The file holds 454 objects from three sources:
-
-| Source | Count | Contents |
-| --- | --- | --- |
-| [data/nebulae_curated.csv](data/nebulae_curated.csv) | 88 | Famous emission, reflection, planetary, supernova-remnant and dark nebulae (M42, Helix, Veil, Gum, Coalsack…) with literature distances and angular sizes |
-| González-Santamaría et al. 2021, [A&A 656, A51](https://doi.org/10.1051/0004-6361/202141916) | 272 | Planetary nebulae with Gaia EDR3 parallaxes (S/N ≥ 3, within 3 kpc), with physical radius and morphology |
-| Zucker et al. 2020, [A&A 633, A51](https://doi.org/10.1051/0004-6361/201936145) | 94 | Local molecular clouds with Gaia DR2 distances, drawn as dark clouds with one puff per measured sightline |
-
-Each entry uses the star fields (`name`, `x`, `y`, `z`, `colour`, `spectral_class` holding the type label), plus:
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `nebula_type` | string | `emission`, `reflection`, `planetary`, `snr` or `dark` |
-| `type` | string | Detailed type, e.g. `H II region`, `Planetary nebula (elliptical)` |
-| `radius_pc` | number | Physical radius used for the glow |
-| `ra_deg`, `dec_deg`, `distance_pc` | number | J2000 position and distance |
-| `ids`, `constellation`, `notes` | string | Optional |
-| `distance_ref`, `distance_range_pc` | string, array | Where the distance came from and its range, if known |
-| `source` | string | Which source the entry came from |
-| `puffs` | array | Molecular clouds only: `[x, y, z, radius]` per sightline (pc, equatorial) |
-
-Regenerate it with (downloads the two VizieR tables, cached in `%TEMP%`; add `--offline` to use the cache):
-
-```powershell
 .\.venv\Scripts\python tools\import_nebulae.py
 ```
 
-Curated planetary nebulae take the Gaia distance when a catalogue match within 1′ has a good parallax.
-Curated radii are `distance × tan(angular size / 2)`.
+Neutron stars are generated from `data/neutron_stars_1000pc.csv`; their J2000 coordinates
+are maintained in `tools/import_neutron_stars.py`, with a designation-based fallback.
+Black holes are generated from `data/black_holes.csv`.
+Nebulae combine `data/nebulae_curated.csv` with two VizieR tables downloaded and cached in
+`%TEMP%`; add `--offline` to reuse the cache.
+These create the corresponding overlay JSON files, independently of the star database.
+See [compact-object sources](USER_GUIDE.md#neutron-star-database) and
+[nebula data and techniques](USER_GUIDE.md#nebulae).
 
-Caveats: curated coordinates, distances and sizes are rounded literature values, good to roughly 5–20%.
-Nebulae use camera-facing procedural billboards, not reconstructed 3D gas volumes. Planetary shapes
-follow catalogue morphology where available, but their orientation and small-scale detail are
-illustrative, not measured images. A molecular cloud's
-size reflects the spread of its sightline distances, so large complexes (Cygnus X, Cepheus) can look
-elongated along the line of sight.
-
-## Extragalactic objects
-
-A curated list of 52 galaxies and clusters lives in [data/galaxies.csv](data/galaxies.csv). It is converted
-to [data/galaxies.json](data/galaxies.json) (under a `galaxies` key) and served at `/api/galaxies`. It
-covers Milky Way satellites (LMC, SMC, Sagittarius, the classical dwarf spheroidals), Local Group members
-(M31, M33, M32, M110, NGC 6822, IC 1613…), nearby landmark galaxies (M81/M82, Centaurus A, M83, M101,
-M51, Sombrero, M87…), four clusters (Fornax, Norma, Perseus, Coma), and a few famous objects (Stephan's
-Quintet, the Cartwheel, Hoag's Object, Cygnus A, 3C 273).
-
-Each entry uses the star fields (`name`, `x`, `y`, `z`, `colour`, `spectral_class` holding the
-morphology), plus:
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `galaxy_type` | string | `spiral`, `elliptical`, `irregular`, `dwarf`, `interacting`, `peculiar`, `active` or `cluster` (sets the marker colour) |
-| `type` | string | Readable type label |
-| `abs_mag` | number | Approximate absolute V magnitude; omitted for clusters |
-| `size_arcmin` | number | Optional major-axis angular size, shown as a physical size in kpc |
-| `ra_deg`, `dec_deg`, `distance_pc` | number | J2000 position and distance |
-| `ids`, `constellation`, `notes`, `distance_ref` | string | Catalogue IDs, location and distance source |
-
-To add or change an object, edit the CSV (RA/Dec are sexagesimal J2000, distance in Mpc) and run:
+### Galaxy catalogue
 
 ```powershell
 .\.venv\Scripts\python tools\import_galaxies.py
 ```
 
-Caveats: positions and distances are rounded literature values (Cepheid, TRGB and eclipsing-binary
-distances for nearby galaxies; Hubble-flow distances with H0 = 70 km/s/Mpc beyond ~20 Mpc), good to roughly
-5–15%. Galaxies are drawn as fixed-size markers, not to scale.
+This combines `data/galaxies.csv`, `data/galaxies-opengnc.csv`,
+`data/galaxies-hizoa-hi.tsv` and `data/galaxies-hizoa-counterparts.tsv` into
+`data/galaxies.json`. Normal rebuilds require no internet access.
+Edit the curated CSV to add or change an object (sexagesimal J2000 RA/Dec, distance in Mpc).
 
-## Sovereignty database
-
-Sovereignties live in [data/sovereignties.json](data/sovereignties.json), separate from the star files, so
-the 12 MB HYG catalogue can be re-imported without losing them and editing a group never touches it.
-The file is small, is fetched in parallel with the stars, and membership is resolved in a single pass
-when the page loads.
-
-```json
-{
-  "sovereignties": [
-    {
-      "name": "Terran Federation",
-      "colour": "#3d8bff",
-      "notes": "Optional description",
-      "stars": ["Sol", "Alpha Centauri A", "Proxima Centauri"]
-    }
-  ]
-}
-```
-
-- `stars` lists members by their exact `name` in `stars.json`, `neutron_stars.json` or `black_holes.json`.
-  Star names are unique across the catalogue. Names that are not found are skipped and reported in the
-  browser console.
-- `colour` must be a `#rrggbb` hex string, and sovereignty names must be unique.
-- A star can belong to at most one sovereignty. The server rejects the file (`/api/sovereignties` returns
-  500) if this or any other rule is broken.
-- The entries shipped in the file are illustrative examples; replace them with your own.
-
-## Planetary systems
-
-Every star has a system record (possibly with no planets). The application reads a complete SQLite
-dataset rather than regenerating planets during requests. Its normalized tables make star coordinates
-and planetary properties directly queryable.
-
-See [SQLite datasets](docs/DATASETS.md) for conversion, cloning, SQL queries, editing and backend
-dataset selection.
-
-**Real data**
-
-- `data/solar_system.json`: Sol's 8 planets, their major moons and minor-moon counts.
-- `data/known_planets.json`: confirmed exoplanets from the
-  [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/) `pscomppars` table, cross-matched to map
-  stars by HD/HIP/Gliese/HR ids, then by position (≤ 1,000 pc). The current match covers 913 map stars and
-  1,317 planets. For these systems, archive stellar parameters override the HYG-derived ones. Only confirmed
-  planets are shown, and their moons are simulated, since no exomoon is confirmed.
-
-**Simulation** (`systems.py`, pure Python, deterministic per star from `seed|name`)
-
-- Stellar parameters (Teff, L, M, R) come from the spectral type, luminosity class and absolute magnitude.
-- Planet counts are Poisson draws. Occurrence rates depend on spectral type, metallicity and evolutionary state:
-  - small planets: SAG13 (Kopparapu et al. 2018), Dressing & Charbonneau (2015);
-  - giant planets: Johnson et al. (2010) mass and metallicity scaling, Fulton et al. (2021)
-    semi-major-axis distribution, Cumming et al. (2008) mass function;
-  - cold Neptunes: Suzuki et al. (2016);
-  - lower rates for giants, white dwarfs and hot or massive stars.
-- Periods and radii are drawn from broken power laws. Radii follow the Fulton et al. (2017) radius valley,
-  and sizes within a system are similar, as in Weiss et al. (2018). Masses come from Chen & Kipping (2017).
-  Eccentricities follow Kipping (2013) and Van Eylen et al. (2019). Systems are spaced for Hill stability.
-- Planet types are terrestrial, super-Earth, sub-Neptune, Neptune-like/ice giant and gas giant (Jupiter, warm, hot).
-- The habitable zone follows Kopparapu et al. (2014). It is conservative (runaway–maximum greenhouse) or
-  optimistic (recent Venus–early Mars).
-- **Potentially habitable** means a rocky planet (0.25–10 M⊕, R ≤ 1.6 R⊕) in the habitable zone of a
-  main-sequence star with Teff 2,600–7,200 K.
-- Tidal locking follows Gladman et al. (1996).
-- Moons are simulated for every planet, sized by host mass (Canup & Ward 2006) and Hill radius (Domingos et
-  al. 2006). Planets too close to their star have no moons (Barnes & O'Brien 2002). Large moons of
-  habitable-zone giants can be flagged habitable.
-
-Main-sequence results (seed 1):
-
-| Host | Any planet | Gas giant | Potentially habitable (optimistic) | Potentially habitable (conservative) |
-| --- | --- | --- | --- | --- |
-| F | 71% | 19% | 6.8% | 4.4% |
-| G | 76% | 16% | 12% | 8.8% |
-| K | 82% | 13% | 13% | 9.3% |
-| M | 89% | 6.6% | 17% | 12.6% |
-
-**Files and regeneration**
+To refresh OpenNGC, download its `database_files/NGC.csv`, then run:
 
 ```powershell
-python tools\fetch_exoplanets.py [--offline]   # refresh data\known_planets.json from the archive
-python tools\generate_systems.py [--seed N]    # rebuild data\systems_summary.json and print statistics
+.\.venv\Scripts\python tools\import_galaxies.py --opengnc C:\path\to\NGC.csv
 ```
 
-See [docs/REGENERATING_SYSTEMS.md](docs/REGENERATING_SYSTEMS.md) for a step-by-step guide.
+To refresh HIZOA-S, replace the bundled files with full VizieR TSV exports
+(`-out.all`, `-out.max=unlimited`) of
+[table 2](https://vizier.cfa.harvard.edu/viz-bin/asu-tsv?-source=J/AJ/151/52/table2&-out.all&-out.max=unlimited)
+and [table 3](https://vizier.cfa.harvard.edu/viz-bin/asu-tsv?-source=J/AJ/151/52/table3&-out.all&-out.max=unlimited),
+then rerun the importer. Preserve source metadata and attribution.
+See [galaxy sources](USER_GUIDE.md#extragalactic-objects),
+[HIZOA cross-matching](USER_GUIDE.md#galaxies-behind-the-milky-way) and
+[the hourglass distribution](USER_GUIDE.md#why-the-galaxy-distribution-looks-like-an-hourglass).
+
+### Sovereignty data
+
+Edit `data/sovereignties.json` separately from the star imports. Each group has a unique name,
+a `#rrggbb` colour and exact member names from the object catalogues.
+A star can belong to at most one group; missing members are reported in the browser console.
+See the [format and user-facing behaviour](USER_GUIDE.md#sovereignty-database).
+
+### Planetary systems
+
+```powershell
+python tools\fetch_exoplanets.py [--offline]   # refresh data\known_planets.json
+python tools\generate_systems.py [--seed N]    # rebuild summary and print statistics
+```
+
+The brackets indicate optional arguments. See
+[regenerating systems](docs/REGENERATING_SYSTEMS.md) for the full workflow.
+These commands prepare inputs/statistics; they do not mutate the active database.
+Clone the active dataset before experimenting, then activate the chosen file in the backend.
+The application reads complete normalized system records without regenerating during requests.
+See [observations, simulation and limitations](USER_GUIDE.md#planetary-systems).
 
 `data/systems_summary.json` holds one planet count and one flag byte per star:
 
@@ -706,26 +229,25 @@ See [docs/REGENERATING_SYSTEMS.md](docs/REGENERATING_SYSTEMS.md) for a step-by-s
 | 32 | Confirmed planets |
 | 64 | Manually edited system |
 
-The generator commands above are useful for simulation statistics and preparing input data. They do
-not mutate the active database. Clone the active dataset before experimenting, then select that file
-in the backend configuration. See [SQLite datasets](docs/DATASETS.md).
+## API endpoints
 
-**Endpoints**
-
-- `/api/stars`: the selected database's full star catalogue and coordinate frame.
+- `/api/stars`: selected star catalogue and coordinate frame.
 - `/api/systems-summary`: compact planet counts and system flags.
-- `/api/system/<star name>`: one system with planets and moons, reconstructed from normalized rows.
+- `/api/system/<star name>`: a system with planets and moons from normalized rows.
+- `/api/star-properties/<star name>`: stellar mass/luminosity, source and estimate status.
+- `/api/neutron-stars`, `/api/black-holes`, `/api/nebulae`: separate object overlays.
+- `/api/galaxies`: combined curated/OpenNGC/HIZOA catalogue, sources and import counts.
 - `/api/query/stars/within`: stars within a radius of an arbitrary coordinate.
 - `/api/query/stars/nearest`: nearest stars to an arbitrary coordinate.
 - `/api/query/stars/<name>/within`: stars within a radius of a named star.
-- `/api/query/distance`: exact distance between two named stars or stable IDs.
+- `/api/query/distance`: exact distance between named stars or stable IDs.
 
-There is no browser-side dataset selector. The backend's `STAREXPLORER_DATABASE` setting chooses the
-database for all clients. Missing or invalid databases produce an explicit error, not request-time
-regeneration.
+## Focused frontend tests
 
-**Limitations**
+These dependency-free tests require Node.js 22+:
 
-- Some HYG entries merge close binaries, so a companion's planets can appear on the merged star. For
-  example, GJ 667 C's planets appear on "Gl 667B".
-- Archive hosts too faint for HYG are not on the map.
+```powershell
+node --experimental-default-type=module tests\test_subspace.mjs
+node --experimental-default-type=module tests\test_primitive_shapes.mjs
+node --experimental-default-type=module tests\test_filters.mjs
+```

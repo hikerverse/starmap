@@ -52,6 +52,7 @@ html, body {
 .view-from-results button:hover { background: rgba(120, 150, 255, 0.15); }
 #view-from-options { display: flex; flex-direction: column; gap: 6px; }
 #view-from-options[hidden] { display: none; }
+#view-from-panel[hidden] { display: none; }
 #view-from-preset {
   max-width: 100%; background: #0d1530; color: #dde6ff; border: 1px solid #3b4f8f;
   border-radius: 4px; padding: 5px; font: inherit;
@@ -309,6 +310,8 @@ button {
   border-radius: 4px; padding: 5px 8px; cursor: pointer;
 }
 button:hover { background: #2e3f75; }
+#return-milky-way { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 12; }
+#return-milky-way[hidden] { display: none; }
 
 #details { top: 52px; right: 12px; width: 260px; max-height: calc(100dvh - 170px); overflow-y: auto; }
 #details h2 { margin: 0 0 8px; font-size: 17px; }

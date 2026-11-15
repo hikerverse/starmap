@@ -19,7 +19,7 @@
     <div class="loading-spinner" aria-hidden="true"></div>
     <p id="loading-stage">Preparing catalogue...</p>
     <progress id="loading-progress" aria-labelledby="loading-stage" aria-describedby="loading-detail"></progress>
-    <p id="loading-detail">Waiting for the server.</p>
+    <p id="loading-detail">Server processing.</p>
   </div>
   <div id="canvas-container"></div>
   <div id="labels"></div>
@@ -34,7 +34,7 @@
         <button id="open-subspace" type="button" aria-controls="subspace-dialog" aria-expanded="false">Subspace disturbance...</button>
         <button id="open-shapes" type="button" aria-controls="shape-dialog" aria-expanded="false">Primitive shapes...</button>
         <button id="reset-view" title="Centre on Sol">Reset view</button>
-        <button id="show-all" title="Zoom out to fit every star">Show all</button>
+        <button id="show-all" title="Fit stars locally, or all galaxies at extragalactic scales">Show all</button>
         <hr>
         <button id="clear-saved-data" title="Forget saved shapes, filters, view, panels and toggles in this browser and reload with defaults">Clear saved data...</button>
       </div>
@@ -227,7 +227,7 @@
       <label><input type="checkbox" id="toggle-nebula" checked> Nebulae <span class="nebula-key">&#10059;</span></label>
       <div id="nebula-filter" class="chip-row" title="Nebula type filter"></div>
       <label title="Milky Way centred on Sagittarius A*, with spiral-arm fits from Reid et al. (2019), including the Local (Orion) Arm near Sol. Fades in when zoomed out. Cloud detail is illustrative; arm locations are uncertain."><input type="checkbox" id="toggle-milky-way" checked> Milky Way</label>
-      <label title="Curated well-known galaxies and galaxy clusters beyond the Milky Way, at their real distances. Click one for details; they cannot be made the centre of rotation."><input type="checkbox" id="toggle-galaxy" checked> Extragalactic <span class="galaxy-key">&#11053;</span></label>
+      <label title="Curated galaxies, OpenNGC and HIZOA radio observations behind the Milky Way. Survey distances are approximate flow estimates. Click for catalogue details; double-click to centre on a galaxy.">      <input type="checkbox" id="toggle-galaxy"> Extragalactic <span class="galaxy-key">&#11053;</span></label>
       <label class="distance-row" title="Only show objects within this distance of the selected star (or the rotation centre when nothing is selected). Leave empty to show everything. Extragalactic objects are not affected.">
         Show within <input type="number" id="distance-filter" min="0" step="any" placeholder="all"> pc
       </label>
@@ -298,6 +298,12 @@
       <tr><th id="h-class">Spectral class</th><td id="d-class"></td></tr>
       <tr id="row-type" hidden><th>Type</th><td id="d-type"></td></tr>
       <tr id="row-ids" hidden><th>Catalogue IDs</th><td id="d-ids"></td></tr>
+      <tr id="row-catalogues" hidden><th>Catalogues / references</th><td id="d-catalogues"></td></tr>
+      <tr id="row-crossmatch" hidden><th>Cross-match</th><td id="d-crossmatch"></td></tr>
+      <tr id="row-counterparts" hidden><th>Published counterparts</th><td id="d-counterparts"></td></tr>
+      <tr id="row-survey-velocity" hidden><th>Radio radial velocity</th><td id="d-survey-velocity"></td></tr>
+      <tr id="row-survey-distance" hidden><th>Radio survey distance</th><td id="d-survey-distance"></td></tr>
+      <tr id="row-survey-mass" hidden><th>HI gas mass</th><td id="d-survey-mass"></td></tr>
       <tr id="row-size" hidden><th>Size</th><td id="d-size"></td></tr>
       <tr id="row-constellation" hidden><th>Constellation</th><td id="d-constellation"></td></tr>
       <tr><th>Colour</th><td><span id="d-swatch" class="swatch"></span><span id="d-colour"></span></td></tr>
@@ -337,6 +343,9 @@
     </div>
     <div id="s-notes"></div>
   </div>
+
+  <button id="return-milky-way" type="button" hidden
+    title="Return to a full-disk Milky Way view and enable the Milky Way and stars">Return to Milky Way</button>
 
   <div id="help" class="panel">
     <div class="desktop-hints">
@@ -408,7 +417,7 @@
             <tr><td><span class="guide-mouse">Scroll</span></td><td>Zoom in and out</td></tr>
             <tr><td><span class="guide-mouse">Double-click</span> a star</td><td>Make it the centre of rotation and fly to about 3 pc from it</td></tr>
           </table>
-          <p class="guide-tip"><b>Tip:</b> <em>View &rarr; Reset view</em> returns to Sol; <em>Show all</em> zooms out to fit every star.
+          <p class="guide-tip"><b>Tip:</b> <em>View &rarr; Reset view</em> returns to Sol; <em>Show all</em> fits stars locally or all galaxies at extragalactic scales.
             The panel at the bottom right shows the current centre, scale and camera position.</p>
         </section>
 
@@ -436,7 +445,8 @@
               It fades in between viewing distances of 500 and 6,000 pc.
               Arm paths and widths follow <a href="https://arxiv.org/html/1910.03357v1#A2.T2" target="_blank" rel="noopener">Reid et al. (2019)</a>,
               including the <b>Local (Orion) Arm</b> around Sol, between Sagittarius and Perseus.
-              Arms taper beyond the measured ranges; the unmeasured far side stays diffuse.
+              Main arms continue beyond the measured ranges as illustrative trailing spirals;
+              the Local Arm remains a short segment near Sol.
               Star positions are unchanged. Cloud detail, the bar and disk thickness remain illustrative;
               this uncertain model does not assign individual stars to arms. The checkbox is saved with your view.</dd>
             <dt>Show within</dt><dd>Quickly limit the map to objects within a number of parsecs of the selected star (or the centre when nothing is selected).</dd>

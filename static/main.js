@@ -258,11 +258,15 @@ controls.dampingFactor = 0.08;
 controls.screenSpacePanning = true;
 controls.zoomSpeed = 1.5;
 controls.minDistance = 0.02;
-controls.maxDistance = 40000;
+controls.maxDistance = 1e10;
 controls.listenToKeyEvents(window); // arrow keys pan
 
 // ---------- Star data (struct-of-arrays for speed) ----------
 let N = 0;
+let milkyWayIndex = -1;
+let galaxyScale = false;
+let lastStarCentre = -1;
+let galaxyBounds;
 let starfieldReady = false;
 let records = [];          // original JSON objects
 let systemStarCount = 0;   // prefix with planetary-system rows; Gaia-only rows follow it
@@ -274,7 +278,7 @@ let namesLower = [];
 let isNamed;               // Uint8Array(N): 1 = proper name, 0 = catalogue id
 let kind;                  // Uint8Array(N): 0 = star, 1 = neutron star, 2 = black hole, 3 = nebula, 4 = galaxy
 let firstSpecial = 0;      // overlays are appended after all loaded stars
-const kindVisible = [true, true, true, true, true];
+const kindVisible = [true, true, true, true, false];
 let specClass;             // Uint8Array(N): index into SPEC_CLASSES (stars) or NEB_TYPES (nebulae)
 const classVisible = SPEC_CLASSES.map(() => true);
 const nebTypeVisible = NEB_TYPES.map(() => true);
@@ -357,6 +361,8 @@ function applyAdvancedFilter(tree, includeGalaxies) {
 }
 
 const isHidden = (i) => !kindVisible[kind[i]] || (kind[i] === 0 && !classVisible[specClass[i]])
+  || (galaxyScale && kind[i] !== KIND_GALAXY)
+  || (i === milkyWayIndex && (!galaxyScale || !milkyWayToggle.checked))
   || (kind[i] === KIND_NEBULA && !nebTypeVisible[specClass[i]])
   || sovState[i] === SOV_HIDDEN || !advancedMask[i] || outsideFilter(i)
   || (viewFromIndex >= 0 && !viewFromVisible[i]);
@@ -383,7 +389,7 @@ const starMaterial = new THREE.ShaderMaterial({
     uShowNeutron: { value: 1.0 },
     uShowBlackHole: { value: 1.0 },
     uShowNebula: { value: 1.0 },
-    uShowGalaxy: { value: 1.0 },
+    uShowGalaxy: { value: 0.0 },
     uViewFromEnabled: { value: 0.0 },
     uLimitingMagnitude: { value: 6.5 },
     uNebTypeVisible: { value: NEB_TYPES.map(() => 1.0) },
@@ -399,6 +405,9 @@ const starMaterial = new THREE.ShaderMaterial({
     attribute float specClass;
     attribute float filterVisible;
     attribute float observerStar;
+    attribute float homeGalaxy;
+    uniform float uShowHomeGalaxy;
+    uniform float uGalaxyScale;
     uniform float uClassVisible[${SPEC_CLASSES.length}];
     uniform float uPixelRatio;
     uniform float uShowStar;
@@ -418,7 +427,7 @@ const starMaterial = new THREE.ShaderMaterial({
       vKind = kind;
       bool isNebula = kind > 2.5 && kind < 3.5;
       bool isGalaxy = kind > 3.5;
-      if (filterVisible < 0.5 || (kind < 0.5 && uShowStar < 0.5) || (kind > 0.5 && kind < 1.5 && uShowNeutron < 0.5)
+      if ((uGalaxyScale > 0.5 && !isGalaxy) || (homeGalaxy > 0.5 && uShowHomeGalaxy < 0.5) || filterVisible < 0.5 || (kind < 0.5 && uShowStar < 0.5) || (kind > 0.5 && kind < 1.5 && uShowNeutron < 0.5)
           || (kind > 1.5 && kind < 2.5 && uShowBlackHole < 0.5) || (isNebula && uShowNebula < 0.5)
           || (isGalaxy && uShowGalaxy < 0.5)
           || (uViewFromEnabled > 0.5 && (kind > 0.5 || observerStar > 0.5))
@@ -511,6 +520,8 @@ const starMaterial = new THREE.ShaderMaterial({
 });
 
 function buildPoints() {
+  starMaterial.uniforms.uShowHomeGalaxy = { value: 0 };
+  starMaterial.uniforms.uGalaxyScale = { value: 0 };
   naturalColours = new Float32Array(3 * N);
   sovColours = new Float32Array(3 * N);
   const sovRgb = sovereignties.map((s) => hexToRgb(s.colour));
@@ -533,6 +544,9 @@ function buildPoints() {
   observerMask = new Float32Array(N);
   observerAttr = new THREE.BufferAttribute(observerMask, 1);
   geo.setAttribute('observerStar', observerAttr);
+  const homeGalaxy = new Float32Array(N);
+  homeGalaxy[milkyWayIndex] = 1;
+  geo.setAttribute('homeGalaxy', new THREE.BufferAttribute(homeGalaxy, 1));
   geo.computeBoundingSphere();
   const points = new THREE.Points(geo, starMaterial);
   points.frustumCulled = false;
@@ -1086,6 +1100,19 @@ const starPanelTitle = document.getElementById('star-panel-title');
 const starListButton = document.getElementById('open-star-list');
 let starPanelDrag = null;
 
+function updateScaleControls() {
+  const subject = galaxyScale ? 'galaxies' : 'stars';
+  const title = galaxyScale ? 'Galaxy list' : 'Star list';
+  starPanelTitle.textContent = title;
+  starListButton.textContent = title;
+  starListButton.title = `Show or hide the ${galaxyScale ? 'galaxy' : 'star'} search and list`;
+  document.getElementById('close-star-panel').setAttribute('aria-label', `Close ${title.toLowerCase()}`);
+  searchEl.placeholder = `Search ${subject}...`;
+  searchEl.setAttribute('aria-label', `Search ${subject}`);
+  document.getElementById('view-from-panel').hidden = galaxyScale;
+  document.getElementById('view-from-selected').hidden = galaxyScale || selected < 0 || kind[selected] !== 0;
+}
+
 function setStarPanelOpen(open, focus = true) {
   starPanel.classList.toggle('hidden', !open);
   starListButton.setAttribute('aria-pressed', String(open));
@@ -1257,6 +1284,35 @@ function formatDistanceRef(d) {
   return `${d.distance_ref}${range}`;
 }
 
+function updateGalaxyCatalogues(d) {
+  const catalogues = document.getElementById('d-catalogues');
+  catalogues.replaceChildren();
+  for (const [i, catalogue] of (d.catalogues ?? []).entries()) {
+    if (i) catalogues.append(document.createTextNode('; '));
+    const link = document.createElement('a');
+    link.textContent = catalogue.name;
+    link.href = catalogue.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    catalogues.append(link);
+  }
+  document.getElementById('row-catalogues').hidden = !catalogues.childNodes.length;
+  const observations = d.hi_observations ?? [];
+  for (const [id, value] of [
+    ['survey-velocity', observations.map(o =>
+      `${o.id}: ${o.radial_velocity_kms} ± ${o.radial_velocity_error_kms} km/s (heliocentric)`).join('; ')],
+    ['survey-mass', observations.map(o =>
+      `${o.id}: ${(10 ** o.log_hi_mass_msun).toExponential(2)} M☉ (neutral hydrogen only)`).join('; ')],
+    ['survey-distance', observations.map(o =>
+      `${o.id}: ${fmtLarge(o.distance_pc)} — ${o.distance_ref}`).join('; ')],
+    ['crossmatch', observations.map(o => `${o.id}: ${o.crossmatch}`).join('; ')],
+    ['counterparts', observations.flatMap(o => o.counterparts.map(c => `${o.id}: ${c}`)).join('; ')],
+  ]) {
+    document.getElementById(`d-${id}`).textContent = value;
+    document.getElementById(`row-${id}`).hidden = !value;
+  }
+}
+
 function updateFilter(force = false) {
   if (!N) return;
   // Galaxies never anchor the filter (they are exempt from it, and a sphere round one would hide every star)
@@ -1306,6 +1362,7 @@ function selectStar(i) {
   if (li) li.scrollIntoView({ block: 'nearest' });
 
   const d = records[i];
+  updateGalaxyCatalogues(d);
   const p = starPos(i);
   document.getElementById('d-name').textContent = d.name;
   document.getElementById('d-class').textContent = d.spectral_class
@@ -1329,8 +1386,8 @@ function selectStar(i) {
   }
   const isNebula = kind[i] === KIND_NEBULA;
   const isGalaxy = kind[i] === KIND_GALAXY;
-  document.getElementById('focus-selected').hidden = isGalaxy;
-  document.getElementById('view-from-selected').hidden = kind[i] !== 0;
+  document.getElementById('focus-selected').hidden = false;
+  updateScaleControls();
   document.getElementById('h-class').textContent = isNebula ? 'Class' : isGalaxy ? 'Morphology' : 'Spectral class';
   document.getElementById('row-absmag').hidden = isNebula || (isGalaxy && typeof d.abs_mag !== 'number');
   document.getElementById('h-absmag').textContent = isGalaxy ? 'Absolute magnitude (V, approx.)' : 'Absolute magnitude';
@@ -1460,15 +1517,13 @@ function focusStar(i) {
     else selectStar(i);
     return;
   }
-  // Extragalactic objects can't become the rotation centre (they are millions of parsecs away); just select them
-  if (kind[i] === KIND_GALAXY) {
-    selectStar(i);
-    return;
-  }
   // Keep the viewing direction, but arrive at a consistent distance from the star.
   const offset = camera.position.clone().sub(controls.target);
   if (offset.lengthSq() === 0) offset.set(0, 0, 1).applyQuaternion(camera.quaternion);
-  offset.setLength(FOCUS_DISTANCE_PC);
+  const galaxyRadius = records[i].size_arcmin && records[i].distance_pc
+    ? records[i].distance_pc * Math.tan(THREE.MathUtils.degToRad(records[i].size_arcmin / 60)) / 2
+    : 15000;
+  offset.setLength(kind[i] === KIND_GALAXY ? Math.max(20000, galaxyRadius * 3) : FOCUS_DISTANCE_PC);
   const p = starPos(i);
   centre = i;
   selectStar(i);
@@ -1658,8 +1713,30 @@ function resetView(instant = false) {
 
 function showAll() {
   centre = -1;
-  viewSphere(allBounds.center, Math.max(allBounds.radius, 1));
+  const bounds = galaxyScale && kindVisible[KIND_GALAXY] ? galaxyBounds : allBounds;
+  viewSphere(bounds.center, Math.max(bounds.radius, 1));
 }
+
+const returnMilkyWayButton = document.getElementById('return-milky-way');
+returnMilkyWayButton.addEventListener('click', () => {
+  exitViewFrom();
+  for (const id of ['toggle-milky-way', 'toggle-stars']) {
+    const toggle = document.getElementById(id);
+    if (!toggle.checked) {
+      toggle.checked = true;
+      toggle.dispatchEvent(new Event('change'));
+    }
+  }
+  selectStar(-1);
+  centre = milkyWayIndex;
+  const target = starPos(milkyWayIndex);
+  const direction = new THREE.Vector3(0, -0.55, 1).normalize();
+  if (frame !== 'galactic') direction.applyMatrix3(GAL_TO_EQ);
+  const halfField = Math.atan(Math.tan(Math.asin(15000 / 35000)) * 1.1 / Math.min(1, camera.aspect));
+  camera.fov = Math.max(camera.fov, THREE.MathUtils.radToDeg(halfField) * 2);
+  camera.updateProjectionMatrix();
+  animateTo(target, target.clone().addScaledVector(direction, 35000), afterMove);
+});
 
 const PLANE_DIRECTIONS = {
   XY: new THREE.Vector3(0, 0, 1),
@@ -2205,7 +2282,7 @@ window.addEventListener('resize', () => {
 
 // ---------- Load data & start ----------
 async function init() {
-  updateLoading('Preparing catalogue...', 'Waiting for the server.');
+  updateLoading('Preparing catalogue...', 'Server processing.');
   document.getElementById('centre-info').textContent = 'Loading stars…';
   const prefs = loadPrefs();
   const savedRadius = Number(prefs.loadRadiusPc);
@@ -2256,6 +2333,12 @@ async function init() {
   if (galacticCentre) {
     milkyWay.setCentre(new THREE.Vector3(galacticCentre.x, galacticCentre.y, galacticCentre.z).applyMatrix3(EQ_TO_GAL));
   }
+  const homeCentre = galacticCentre || new THREE.Vector3(8178, 0, 0).applyMatrix3(GAL_TO_EQ);
+  milkyWayIndex = records.length;
+  records.push({ name: 'Milky Way', x: homeCentre.x, y: homeCentre.y, z: homeCentre.z,
+    colour: '#ffd9a0', spectral_class: 'Barred spiral', galaxy_type: 'spiral',
+    type: 'Home galaxy', abs_mag: -20.9, notes: 'Our galaxy; symbol replaces the detailed disk at extragalactic scales.' });
+  kinds.push(KIND_GALAXY);
   N = records.length;
   updateLoading('Processing stars...', `0 of ${N.toLocaleString()} catalogue objects`, 0, N);
   await yieldLoading();
@@ -3029,6 +3112,11 @@ function computeBounds() {
   // "Show all" fits the star catalogue; distant black holes (e.g. Sgr A* at 8 kpc) would shrink it to a dot
   allBounds = new THREE.Box3().setFromBufferAttribute(new THREE.BufferAttribute(pos.subarray(0, 3 * firstSpecial), 3))
     .getBoundingSphere(new THREE.Sphere());
+  const box = new THREE.Box3();
+  const point = new THREE.Vector3();
+  for (let i = firstSpecial; i < N; i++) if (kind[i] === KIND_GALAXY) box.expandByPoint(starPos(i, point));
+  galaxyBounds = box.getBoundingSphere(new THREE.Sphere());
+  controls.maxDistance = Math.max(40000, galaxyBounds.radius * 5);
 }
 
 // Rotate every position (and the camera) between the galactic and equatorial frames
@@ -3125,8 +3213,44 @@ function updateCameraInfo() {
 function loop(now) {
   requestAnimationFrame(loop);
   if (!starfieldReady) return;
+  if (!galaxyScale && centre >= 0 && kind[centre] === 0) lastStarCentre = centre;
   stepAnimation(now);
   if (viewFromIndex < 0) controls.update();
+  const nextGalaxyScale = camera.position.distanceTo(starPos(milkyWayIndex, _objPos)) >= 40000;
+  if (nextGalaxyScale !== galaxyScale) {
+    galaxyScale = nextGalaxyScale;
+    returnMilkyWayButton.hidden = !galaxyScale;
+    updateScaleControls();
+    const toggle = document.getElementById('toggle-galaxy');
+    if (toggle.checked !== galaxyScale) {
+      toggle.checked = galaxyScale;
+      toggle.dispatchEvent(new Event('change'));
+    }
+    if (galaxyScale && !animation) {
+      centre = milkyWayIndex;
+      controls.target.copy(starPos(milkyWayIndex));
+      camera.lookAt(controls.target);
+      afterMove();
+    }
+    if (!galaxyScale && lastStarCentre >= 0 && (centre < 0 || kind[centre] !== 0)) {
+      centre = lastStarCentre;
+      const target = starPos(centre);
+      controls.target.copy(target);
+      if (animation) {
+        animation.fromTarget.copy(target);
+        animation.toTarget.copy(target);
+      }
+      camera.lookAt(target);
+      afterMove();
+    }
+    starMaterial.uniforms.uGalaxyScale.value = galaxyScale ? 1 : 0;
+    if (selected >= 0 && isHidden(selected)) selectStar(-1);
+    updateNebulaVisibility();
+    labelsDirty = true;
+    renderList();
+    refreshViewFromResults();
+  }
+  starMaterial.uniforms.uShowHomeGalaxy.value = galaxyScale && milkyWayToggle.checked ? 1 : 0;
   updateGrid();
   updateLabels();
   shapeEditor.updateLabels();
@@ -3134,7 +3258,7 @@ function loop(now) {
   updateOrientation();
   if (frame === 'galactic') displayToGalactic.identity();
   else displayToGalactic.copy(equatorialToGalactic);
-  milkyWay.update(camera, displayToGalactic, camera.position.distanceTo(controls.target), milkyWayToggle.checked);
+  milkyWay.update(camera, displayToGalactic, camera.position.distanceTo(controls.target), milkyWayToggle.checked && !galaxyScale);
   subspace.update(camera, displayToGalactic);
   renderer.render(scene, camera);
   if (loadingFinishing && !loadingOverlay.classList.contains('fade-out')) {
