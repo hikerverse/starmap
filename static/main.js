@@ -83,6 +83,11 @@ let loadedSource = 'both';
 const loadDistanceSelect = document.getElementById('load-distance');
 const loadSourceSelect = document.getElementById('load-source');
 const applyLoadDistance = document.getElementById('apply-load-distance');
+const viewFromPanel = document.getElementById('view-from-panel');
+const viewFromPreset = document.getElementById('view-from-preset');
+const viewFromMagnitude = document.getElementById('view-from-magnitude');
+const viewFromMagnitudeValue = document.getElementById('view-from-magnitude-value');
+const viewFromCount = document.getElementById('view-from-count');
 function updateCatalogueButton() {
   applyLoadDistance.disabled = Number(loadDistanceSelect.value) === loadedRadiusPc
     && loadSourceSelect.value === loadedSource;
@@ -279,6 +284,13 @@ let scrX, scrY, scrKey, scrBin;
 
 let selected = -1;
 let centre = -1;
+let viewFromIndex = -1;
+let viewFromVisible = null;
+let viewFromApparentMagnitude = null;
+let viewFromState = null;
+let observerMask;
+let observerAttr;
+let viewDrag = null;
 
 const starPos = (i, target = new THREE.Vector3()) => target.set(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]);
 const shapeEditor = createShapeEditor({
@@ -341,7 +353,8 @@ function applyAdvancedFilter(tree, includeGalaxies) {
 
 const isHidden = (i) => !kindVisible[kind[i]] || (kind[i] === 0 && !classVisible[specClass[i]])
   || (kind[i] === KIND_NEBULA && !nebTypeVisible[specClass[i]])
-  || sovState[i] === SOV_HIDDEN || !advancedMask[i] || outsideFilter(i);
+  || sovState[i] === SOV_HIDDEN || !advancedMask[i] || outsideFilter(i)
+  || (viewFromIndex >= 0 && !viewFromVisible[i]);
 // Neutron stars and black holes: always labelled when on screen
 const isCompactSpecial = (i) => kind[i] === KIND_NEUTRON || kind[i] === KIND_BLACK_HOLE;
 const starSizePx = (i, dist) =>
@@ -366,6 +379,8 @@ const starMaterial = new THREE.ShaderMaterial({
     uShowBlackHole: { value: 1.0 },
     uShowNebula: { value: 1.0 },
     uShowGalaxy: { value: 1.0 },
+    uViewFromEnabled: { value: 0.0 },
+    uLimitingMagnitude: { value: 6.5 },
     uNebTypeVisible: { value: NEB_TYPES.map(() => 1.0) },
     uFilterCentre: { value: filterCentre },
     uFilterRadius: { value: 0.0 },
@@ -378,6 +393,7 @@ const starMaterial = new THREE.ShaderMaterial({
     attribute float sovState;
     attribute float specClass;
     attribute float filterVisible;
+    attribute float observerStar;
     uniform float uClassVisible[${SPEC_CLASSES.length}];
     uniform float uPixelRatio;
     uniform float uShowStar;
@@ -385,6 +401,8 @@ const starMaterial = new THREE.ShaderMaterial({
     uniform float uShowBlackHole;
     uniform float uShowNebula;
     uniform float uShowGalaxy;
+    uniform float uViewFromEnabled;
+    uniform float uLimitingMagnitude;
     uniform float uNebTypeVisible[${NEB_TYPES.length}];
     uniform vec3 uFilterCentre;
     uniform float uFilterRadius;
@@ -398,6 +416,7 @@ const starMaterial = new THREE.ShaderMaterial({
       if (filterVisible < 0.5 || (kind < 0.5 && uShowStar < 0.5) || (kind > 0.5 && kind < 1.5 && uShowNeutron < 0.5)
           || (kind > 1.5 && kind < 2.5 && uShowBlackHole < 0.5) || (isNebula && uShowNebula < 0.5)
           || (isGalaxy && uShowGalaxy < 0.5)
+          || (uViewFromEnabled > 0.5 && (kind > 0.5 || observerStar > 0.5))
           || (sovState > 0.5 && sovState < 1.5)
           || (kind < 0.5 && uClassVisible[int(specClass + 0.5)] < 0.5)
           || (isNebula && uNebTypeVisible[int(specClass + 0.5)] < 0.5)
@@ -409,6 +428,11 @@ const starMaterial = new THREE.ShaderMaterial({
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
       float d = max(length(mv.xyz), 1e-3);
       float appMag = absMag + 5.0 * log(d / 10.0) / log(10.0);
+      if (uViewFromEnabled > 0.5 && appMag > uLimitingMagnitude) {
+        gl_PointSize = 0.0;
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        return;
+      }
       float base = clamp(${SIZE.a.toFixed(3)} - ${SIZE.b.toFixed(3)} * appMag, ${SIZE.min.toFixed(3)}, ${SIZE.max.toFixed(3)});
       float nearF = min(1.0, ${SIZE.nearDist.toFixed(3)} / d);
       float size = max(base, ${SIZE.min.toFixed(3)} + ${SIZE.nearBoost.toFixed(3)} * nearF);
@@ -501,6 +525,9 @@ function buildPoints() {
   geo.setAttribute('specClass', new THREE.BufferAttribute(new Float32Array(specClass), 1));
   advancedMaskAttr = new THREE.BufferAttribute(advancedMask, 1);
   geo.setAttribute('filterVisible', advancedMaskAttr);
+  observerMask = new Float32Array(N);
+  observerAttr = new THREE.BufferAttribute(observerMask, 1);
+  geo.setAttribute('observerStar', observerAttr);
   geo.computeBoundingSphere();
   const points = new THREE.Points(geo, starMaterial);
   points.frustumCulled = false;
@@ -1107,7 +1134,9 @@ for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
 window.addEventListener('resize', keepStarPanelInView);
 
 function brightnessFromSol(i) {
-  const d = Math.hypot(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]);
+  const d = viewFromIndex >= 0
+    ? starPos(i).distanceTo(starPos(viewFromIndex))
+    : Math.hypot(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]);
   return appMagAt(absMag[i], d);
 }
 
@@ -1294,6 +1323,7 @@ function selectStar(i) {
   const isNebula = kind[i] === KIND_NEBULA;
   const isGalaxy = kind[i] === KIND_GALAXY;
   document.getElementById('focus-selected').hidden = isGalaxy;
+  document.getElementById('view-from-selected').hidden = kind[i] !== 0;
   document.getElementById('h-class').textContent = isNebula ? 'Class' : isGalaxy ? 'Morphology' : 'Spectral class';
   document.getElementById('row-absmag').hidden = isNebula || (isGalaxy && typeof d.abs_mag !== 'number');
   document.getElementById('h-absmag').textContent = isGalaxy ? 'Absolute magnitude (V, approx.)' : 'Absolute magnitude';
@@ -1314,7 +1344,7 @@ function selectStar(i) {
     ? `${fmt(sol)} (${(sol * 3.26156).toFixed(2)} ly)`
     : formatDistance(sol);
   updateCentreDistance();
-  document.getElementById('details').classList.remove('hidden');
+  document.getElementById('details').classList.toggle('hidden', viewFromIndex >= 0);
 }
 
 function updateCentreDistance() {
@@ -1333,8 +1363,9 @@ function updateCentreDistance() {
 
 function updateCentreInfo() {
   const t = controls.target;
-  document.getElementById('centre-info').textContent = centre >= 0
-    ? `Rotating around: ${records[centre].name}`
+  document.getElementById('centre-info').textContent = viewFromIndex >= 0
+    ? `Viewing from: ${records[viewFromIndex].name}`
+    : centre >= 0 ? `Rotating around: ${records[centre].name}`
     : `Rotating around: (${t.x.toFixed(2)}, ${t.y.toFixed(2)}, ${t.z.toFixed(2)}) pc`;
   centreDrop.set(centre);
   updateCentreDistance();
@@ -1379,6 +1410,11 @@ function afterMove() {
 }
 
 function focusStar(i) {
+  if (viewFromIndex >= 0) {
+    if (kind[i] === 0) setViewFromStar(i);
+    else selectStar(i);
+    return;
+  }
   // Extragalactic objects can't become the rotation centre (they are millions of parsecs away); just select them
   if (kind[i] === KIND_GALAXY) {
     selectStar(i);
@@ -1394,6 +1430,104 @@ function focusStar(i) {
   animateTo(p, p.clone().add(offset), afterMove);
   updateCentreInfo();
 }
+
+function updateViewFromVisibility() {
+  if (viewFromIndex < 0) return;
+  const limit = Number(viewFromMagnitude.value);
+  starMaterial.uniforms.uLimitingMagnitude.value = limit;
+  viewFromMagnitudeValue.value = limit.toFixed(1);
+  let visible = 0;
+  for (let i = 0; i < N; i++) {
+    const shown = kind[i] === 0 && i !== viewFromIndex
+      && viewFromApparentMagnitude[i] <= limit;
+    viewFromVisible[i] = shown ? 1 : 0;
+    if (shown) visible++;
+  }
+  viewFromCount.textContent = `${visible.toLocaleString()} catalogue stars meet this limit`;
+  updateFilter(true);
+}
+
+function setViewFromStar(i) {
+  if (kind[i] !== 0) return;
+  if (viewFromIndex < 0) {
+    viewFromState = {
+      camera: camera.position.clone(),
+      target: controls.target.clone(),
+      fov: camera.fov,
+      centre,
+      controlsEnabled: controls.enabled,
+    };
+  }
+  animation = null;
+  viewFromVisible = new Uint8Array(N);
+  viewFromIndex = i;
+  selectStar(i);
+  const direction = camera.getWorldDirection(new THREE.Vector3());
+  camera.position.copy(starPos(i));
+  camera.lookAt(camera.position.clone().add(direction));
+  controls.target.copy(camera.position).add(direction);
+  controls.enabled = false;
+  observerMask.fill(0);
+  observerMask[i] = 1;
+  observerAttr.needsUpdate = true;
+  viewFromApparentMagnitude = new Float32Array(N);
+  const observer = starPos(i);
+  for (let j = 0; j < N; j++) {
+    if (kind[j] !== 0 || j === i) continue;
+    const dx = pos[3 * j] - observer.x, dy = pos[3 * j + 1] - observer.y, dz = pos[3 * j + 2] - observer.z;
+    viewFromApparentMagnitude[j] = appMagAt(absMag[j], Math.hypot(dx, dy, dz));
+  }
+  starMaterial.uniforms.uViewFromEnabled.value = 1.0;
+  document.getElementById('view-from-name').textContent = records[i].name;
+  viewFromPanel.classList.remove('hidden');
+  document.getElementById('details').classList.add('hidden');
+  document.getElementById('orientation-widget').style.display = 'none';
+  document.getElementById('frame-select').disabled = true;
+  helpers.visible = false;
+  centre = i;
+  updateViewFromVisibility();
+  selectionRing.visible = false;
+  updateCentreInfo();
+  updateCameraInfo();
+  labelsDirty = true;
+}
+
+function exitViewFrom() {
+  if (viewFromIndex < 0) return;
+  viewFromIndex = -1;
+  viewFromVisible = null;
+  viewFromApparentMagnitude = null;
+  starMaterial.uniforms.uViewFromEnabled.value = 0.0;
+  observerMask.fill(0);
+  observerAttr.needsUpdate = true;
+  controls.enabled = viewFromState.controlsEnabled;
+  camera.position.copy(viewFromState.camera);
+  controls.target.copy(viewFromState.target);
+  camera.fov = viewFromState.fov;
+  camera.updateProjectionMatrix();
+  centre = viewFromState.centre;
+  viewFromState = null;
+  viewFromPanel.classList.add('hidden');
+  document.getElementById('details').classList.toggle('hidden', selected < 0);
+  document.getElementById('orientation-widget').style.display = '';
+  document.getElementById('frame-select').disabled = false;
+  helpers.visible = document.getElementById('toggle-grid').checked;
+  selectionRing.visible = selected >= 0;
+  updateFilter(true);
+  updateCentreInfo();
+  updateCameraInfo();
+  labelsDirty = true;
+}
+
+viewFromPreset.addEventListener('change', () => {
+  if (viewFromPreset.value !== 'custom') viewFromMagnitude.value = viewFromPreset.value;
+  if (viewFromIndex >= 0) updateViewFromVisibility();
+});
+viewFromMagnitude.addEventListener('input', () => {
+  viewFromPreset.value = 'custom';
+  if (viewFromIndex >= 0) updateViewFromVisibility();
+});
+document.getElementById('close-view-from').addEventListener('click', exitViewFrom);
 
 const VIEW_DIR = new THREE.Vector3(1, -1.4, 0.9).normalize();
 
@@ -1444,13 +1578,17 @@ const activePointers = new Set();
 renderer.domElement.addEventListener('pointerdown', (e) => {
   activePointers.add(e.pointerId);
   downPos = activePointers.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+  viewDrag = viewFromIndex >= 0 && activePointers.size === 1 && e.button === 0
+    ? { id: e.pointerId, x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY } : null;
 });
 renderer.domElement.addEventListener('pointercancel', (e) => {
   activePointers.delete(e.pointerId);
   downPos = null;
+  viewDrag = null;
 });
 renderer.domElement.addEventListener('pointerup', (e) => {
   activePointers.delete(e.pointerId);
+  if (viewDrag?.id === e.pointerId) viewDrag = null;
   if (!downPos || downPos.id !== e.pointerId || e.button !== 0) return;
   const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
   downPos = null;
@@ -1464,6 +1602,20 @@ renderer.domElement.addEventListener('dblclick', (e) => {
 
 let hoverEvent = null;
 renderer.domElement.addEventListener('pointermove', (e) => {
+  if (viewDrag?.id === e.pointerId) {
+    const dx = e.clientX - viewDrag.x, dy = e.clientY - viewDrag.y;
+    if (Math.hypot(e.clientX - viewDrag.startX, e.clientY - viewDrag.startY) > CLICK_MOVE_TOLERANCE) {
+      downPos = null;
+    }
+    viewDrag.x = e.clientX;
+    viewDrag.y = e.clientY;
+    camera.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -dx * 0.004));
+    camera.rotateX(-dy * 0.004);
+    controls.target.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()));
+    updateCameraInfo();
+    labelsDirty = true;
+    return;
+  }
   if (downPos && Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > CLICK_MOVE_TOLERANCE) downPos = null;
   if (e.buttons || e.pointerType === 'touch') return;
   if (!hoverEvent) {
@@ -1474,6 +1626,13 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   }
   hoverEvent = e;
 });
+renderer.domElement.addEventListener('wheel', (e) => {
+  if (viewFromIndex < 0) return;
+  e.preventDefault();
+  camera.fov = THREE.MathUtils.clamp(camera.fov * (e.deltaY > 0 ? 1.08 : 1 / 1.08), 20, 100);
+  camera.updateProjectionMatrix();
+  labelsDirty = true;
+}, { passive: false });
 
 controls.addEventListener('change', () => {
   if (animation || changingViewPlane) return;
@@ -1491,10 +1650,12 @@ controls.addEventListener('end', () => {
 
 document.getElementById('reset-view').addEventListener('click', () => {
   document.getElementById('view-menu').open = false;
+  exitViewFrom();
   resetView();
 });
 document.getElementById('show-all').addEventListener('click', () => {
   document.getElementById('view-menu').open = false;
+  exitViewFrom();
   showAll();
 });
 const topMenus = [...document.querySelectorAll('#top-menu details')];
@@ -1515,6 +1676,9 @@ compactLayout.addEventListener('change', () => setControlsOpen(false));
 setControlsOpen(false);
 document.getElementById('focus-selected').addEventListener('click', () => {
   if (selected >= 0) focusStar(selected);
+});
+document.getElementById('view-from-selected').addEventListener('click', () => {
+  if (selected >= 0 && kind[selected] === 0) setViewFromStar(selected);
 });
 document.addEventListener('pointerdown', (event) => {
   for (const menu of topMenus) if (!menu.contains(event.target)) menu.open = false;
@@ -1692,7 +1856,10 @@ window.addEventListener('keydown', (e) => {
   openGuide();
 });
 document.getElementById('close-details').addEventListener('click', () => selectStar(-1));
-document.getElementById('toggle-grid').addEventListener('change', (e) => { helpers.visible = e.target.checked; persist(); });
+document.getElementById('toggle-grid').addEventListener('change', (e) => {
+  helpers.visible = viewFromIndex < 0 && e.target.checked;
+  persist();
+});
 document.getElementById('toggle-labels').addEventListener('change', (e) => {
   labelLayer.hidden = !e.target.checked;
   labelsDirty = true;
@@ -1772,7 +1939,7 @@ function buildNebulaFilter() {
 
 // Shared refresh after any show/hide filter changes
 function visibilityChanged() {
-  if (selected >= 0 && isHidden(selected)) selectStar(-1);
+  if (selected >= 0 && selected !== viewFromIndex && isHidden(selected)) selectStar(-1);
   updateFilter(true);
   labelsDirty = true;
   renderList();
@@ -2756,7 +2923,7 @@ function updateCameraInfo() {
 function loop(now) {
   requestAnimationFrame(loop);
   stepAnimation(now);
-  controls.update();
+  if (viewFromIndex < 0) controls.update();
   updateGrid();
   updateLabels();
   shapeEditor.updateLabels();

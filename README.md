@@ -169,6 +169,13 @@ neighbourhood around the camera looks right at any zoom level. Labels are declut
 the selected/centre star first, then stars near the rotation centre, then the brightest (named stars
 ahead of catalogue ids). Zoom in to reveal more. The grid rescales with zoom (spacing shown bottom-centre).
 
+Select a star and choose **View from** in its details to place the camera at that star and explore
+the surrounding sky. Drag to look around, scroll to zoom, and adjust the limiting apparent magnitude
+or choose an illustrative dark-sky, binocular or small-telescope preset. The selected star is omitted
+from the view. This is only an approximation: the catalogue is incomplete, some magnitudes and
+distances are estimated, and equipment presets do not simulate optics, sky brightness or dark adaptation.
+Choose **Exit** to restore the previous map view.
+
 Open **View → Star list** to show a floating, draggable panel listing the 25 stars nearest the rotation
 centre; type in its search box to find stars by name. Click an entry to select it, double-click to fly to
 it. Drag the panel by its title; close it with **×**, the menu item again, or Escape (the first Escape

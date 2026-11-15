@@ -22,6 +22,27 @@
   <div id="canvas-container"></div>
   <div id="labels"></div>
 
+  <section id="view-from-panel" class="panel hidden" aria-labelledby="view-from-title">
+    <div class="view-from-heading">
+      <h2 id="view-from-title">View from <span id="view-from-name"></span></h2>
+      <button id="close-view-from" type="button">Exit</button>
+    </div>
+    <label for="view-from-preset">Viewing conditions</label>
+    <select id="view-from-preset">
+      <option value="3">Bright night sky (mag 3)</option>
+      <option value="6.5" selected>Very dark night sky (mag 6.5)</option>
+      <option value="9">Binoculars (mag 9)</option>
+      <option value="12">Small telescope (mag 12)</option>
+      <option value="custom">Custom</option>
+    </select>
+    <label for="view-from-magnitude">Limiting magnitude
+      <output id="view-from-magnitude-value" for="view-from-magnitude">6.5</output>
+    </label>
+    <input id="view-from-magnitude" type="range" min="-2" max="15" step="0.1" value="6.5">
+    <p id="view-from-count" role="status" aria-live="polite"></p>
+    <small>Approximate: catalogue coverage is incomplete; instrument limits are illustrative.</small>
+  </section>
+
   <nav id="top-menu" aria-label="Application menu">
     <button id="toggle-controls" type="button" aria-expanded="false" aria-controls="sidebar">Controls</button>
     <details id="view-menu">
@@ -257,6 +278,7 @@
     <button id="close-details" title="Close">&times;</button>
     <h2 id="d-name"></h2>
     <button id="focus-selected" type="button">Centre on object</button>
+    <button id="view-from-selected" type="button" hidden>View from</button>
     <p id="subspace-selected" hidden></p>
     <table>
       <tr><th id="h-class">Spectral class</th><td id="d-class"></td></tr>
@@ -402,6 +424,7 @@
               Star positions are unchanged. Cloud detail, the bar and disk thickness remain illustrative;
               this uncertain model does not assign individual stars to arms. The checkbox is saved with your view.</dd>
             <dt>Show within</dt><dd>Quickly limit the map to objects within a number of parsecs of the selected star (or the centre when nothing is selected).</dd>
+            <dt>View from a star</dt><dd>Select a star and choose <b>View from</b> to place the camera at its catalogue position. Drag to look around and use the wheel to zoom. Set a limiting magnitude or choose a rough dark-sky, binocular or telescope preset. This is an approximate star-only view: the catalogue is incomplete, magnitudes may be estimated, and equipment limits do not model real optics.</dd>
             <dt>Star catalogue and load radius</dt><dd>Choose HYG, GAIA, or Both, and a radius from Sol (1, 2, or 5 kpc), then reload. These selections are saved. GAIA includes HYG stars matched to Gaia and a quality-filtered sample of Gaia additions. Matched stars retain their HYG positions and planetary systems; additions have no planetary-system data. Some Gaia additions have broad spectral classes estimated from their Gaia temperatures, marked (est.); temperature alone cannot determine luminosity class. Both displays each matched star once. Other object overlays are independent of this selection.</dd>
             <dt>Subspace disturbance</dt><dd>Open <b>View &rarr; Subspace disturbance...</b> for an optional fictional volumetric field within 1,200 pc of Sol.
               Change <b>Seed</b> or use <b>Regenerate</b> for a different field; the same seed and generation
@@ -452,6 +475,17 @@
           <h3><span class="guide-icon">&#10133;</span> Axes &amp; views</h3>
           <p>The widget at the bottom left turns with the camera so you always know which way the Galactic Centre and the pole lie.
             Its <kbd>XY</kbd> <kbd>XZ</kbd> <kbd>YZ</kbd> buttons snap the camera to look straight at that plane.</p>
+        </section>
+
+        <section id="guide-view-from">
+          <h3><span class="guide-icon">&#10022;</span> View from a star</h3>
+          <p>Select a star, then choose <b>View from</b> in its details. The camera moves to the star's catalogue position;
+            drag to look around and scroll to zoom. Use the limiting-magnitude slider or choose a rough viewing preset.
+            The selected star itself is omitted because the viewpoint is at its location. Choose <b>Exit</b> to return
+            to your previous map view.</p>
+          <p>This is illustrative, not an observation-grade sky simulator. It filters catalogue stars using their
+            absolute magnitudes and estimated distances, but the catalogue is incomplete and biased, some magnitudes
+            are approximate, and binocular/telescope presets do not account for optics, sky glow or adaptation.</p>
         </section>
 
         <section id="guide-saved">
