@@ -107,6 +107,42 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(catalogue["catalogue_fingerprint"],
                          self.store.catalogue()["catalogue_fingerprint"])
         self.assertEqual(len(self.store.summary()["planets"]), 2)
+        properties = self.store.stellar_properties("Gaia DR3 1")
+        self.assertTrue(properties["estimated"])
+        self.assertGreater(properties["mass"], 0)
+        self.assertGreater(properties["lum"], 0)
+        expected = D.S.star_properties("Other", 5.0)
+        self.assertEqual(properties["mass"], expected["mass"])
+        self.assertEqual(properties["lum"], expected["lum"])
+
+    def test_stellar_properties_reuses_stored_parameters(self):
+        for name in ("Sol", "Nearby"):
+            properties = self.store.stellar_properties(name)
+            star = self.store.system(name)["star"]
+            self.assertEqual(properties["mass"], star["mass"])
+            self.assertEqual(properties["lum"], star["lum"])
+            self.assertEqual(properties["estimated"], star["provenance"] == "derived")
+        with self.assertRaises(D.DatasetNotFound):
+            self.store.stellar_properties("Missing")
+
+    def test_stellar_properties_api(self):
+        application._systems_state.clear()
+        self.addCleanup(application._systems_state.clear)
+        with patch.object(application, "DATASET_FILE", self.database):
+            client = application.app.test_client()
+            response = client.get("/api/star-properties/Sol")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json, self.store.stellar_properties("Sol"))
+            self.assertEqual(client.get("/api/star-properties/Missing").status_code, 404)
+
+    def test_stellar_properties_does_not_invent_missing_parameters(self):
+        with closing(sqlite3.connect(self.database)) as db:
+            db.execute("DELETE FROM systems WHERE star_id=(SELECT id FROM stars WHERE name='Nearby')")
+            db.execute("UPDATE stars SET abs_mag_present=0 WHERE name='Nearby'")
+            db.commit()
+        properties = self.store.stellar_properties("Nearby")
+        self.assertIsNone(properties["lum"])
+        self.assertIsNone(properties["mass"])
 
     def test_create_builds_a_standalone_dataset_without_legacy_snapshot(self):
         created = self.root / "created.sqlite"

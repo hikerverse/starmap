@@ -1295,6 +1295,7 @@ function selectStar(i) {
   selectionRing.visible = i >= 0;
   selectedDrop.set(i);
   highlightList();
+  stellarPropertiesRequest++;
   if (i < 0) {
     updateCentreDistance();
     document.getElementById('details').classList.add('hidden');
@@ -1334,6 +1335,7 @@ function selectStar(i) {
   document.getElementById('row-absmag').hidden = isNebula || (isGalaxy && typeof d.abs_mag !== 'number');
   document.getElementById('h-absmag').textContent = isGalaxy ? 'Absolute magnitude (V, approx.)' : 'Absolute magnitude';
   updatePlanetRow(i);
+  updateStellarProperties(i);
   const tag = frame === 'galactic' ? 'gal' : 'eq';
   for (const [k, v] of [['x', p.x], ['y', p.y], ['z', p.z]]) {
     document.getElementById(`d-${k}`).textContent = fmtLarge(v);
@@ -1351,6 +1353,43 @@ function selectStar(i) {
     : formatDistance(sol);
   updateCentreDistance();
   document.getElementById('details').classList.toggle('hidden', viewFromIndex >= 0 && selected < 0);
+}
+
+let stellarPropertiesRequest = 0;
+
+async function updateStellarProperties(i) {
+  const request = stellarPropertiesRequest;
+  const isStar = kind[i] === 0;
+  document.getElementById('row-luminosity').hidden = !isStar;
+  document.getElementById('row-stellar-source').hidden = !isStar;
+  if (!isStar) return;
+  document.getElementById('row-mass').hidden = false;
+  const mass = document.getElementById('d-mass');
+  const luminosity = document.getElementById('d-luminosity');
+  const source = document.getElementById('d-stellar-source');
+  mass.textContent = luminosity.textContent = 'Loading...';
+  source.textContent = '';
+  try {
+    const properties = await datasetJson(`/api/star-properties/${encodeURIComponent(records[i].name)}`);
+    if (request !== stellarPropertiesRequest) return;
+    if (activeDataset && properties.dataset_id !== activeDataset.id) {
+      throw new Error('Stellar properties do not match the active dataset. Reload the page.');
+    }
+    for (const key of ['mass', 'lum']) {
+      if (properties[key] !== null && (!Number.isFinite(properties[key]) || properties[key] <= 0)) {
+        throw new Error('Invalid stellar properties in the active dataset.');
+      }
+    }
+    const suffix = properties.estimated ? ' (est.)' : '';
+    mass.textContent = properties.mass === null ? 'Unavailable' : `${sig(properties.mass)} M☉${suffix}`;
+    luminosity.textContent = properties.lum === null ? 'Unavailable' : `${sig(properties.lum)} L☉${suffix}`;
+    source.textContent = properties.source || 'No stellar parameters available';
+  } catch (err) {
+    if (request !== stellarPropertiesRequest) return;
+    console.error('Stellar properties loading failed:', err);
+    mass.textContent = luminosity.textContent = 'Unavailable';
+    source.textContent = `Could not load stellar properties: ${err.message}`;
+  }
 }
 
 function updateCentreDistance() {

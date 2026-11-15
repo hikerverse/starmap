@@ -288,6 +288,10 @@ def api_systems_summary():
 def api_system(name: str):
     return dataset_response("system", name)
 
+@app.route("/api/star-properties/<path:name>")
+def api_star_properties(name: str):
+    return dataset_response("star-properties", name)
+
 
 @lru_cache(maxsize=16)
 def dataset_summary_payload(path: str, mtime_ns: int, size: int, max_distance_pc: int,
@@ -306,6 +310,9 @@ def dataset_response(operation: str, name: str | None = None, options=None) -> R
             raw, compressed = dataset_summary_payload(str(DATASET_FILE), stat.st_mtime_ns, stat.st_size,
                                                        *options)
             response = gzip_response(raw, compressed)
+        elif operation == "star-properties":
+            response = Response(json.dumps(store.stellar_properties(name), ensure_ascii=False,
+                                           allow_nan=False), mimetype="application/json")
         else:
             response = Response(json.dumps(store.system(name), ensure_ascii=False,
                                            separators=(",", ":"), allow_nan=False), mimetype="application/json")

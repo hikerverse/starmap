@@ -20,6 +20,9 @@ py -3.13 -m venv .venv
 $env:PORT=5057; .\.venv\Scripts\python app.py   # use another port if 5001 is busy
 ```
 
+Use the top menu's **Catalogue** item to choose HYG, GAIA, or Both and the load radius from Sol
+(1, 2, or 5 kpc), then select **Reload catalogue**. These selections are saved.
+
 The map and planetary systems are loaded from the active standalone SQLite dataset. The app prefers
 `data/stars-gaia-temperatures.sqlite`, then `data/stars-gaia-nearby.sqlite`, then `data/stars-gaia-expanded.sqlite`, then
 `data/stars-gaia-enriched.sqlite`, then `data/stars.sqlite`;
@@ -173,6 +176,11 @@ Star size and brightness follow each star's apparent magnitude as seen from the 
 neighbourhood around the camera looks right at any zoom level. Labels are decluttered automatically:
 the selected/centre star first, then stars near the rotation centre, then the brightest (named stars
 ahead of catalogue ids). Zoom in to reveal more. The grid rescales with zoom (spacing shown bottom-centre).
+
+The star details panel shows mass (M☉) and bolometric luminosity (L☉), fetched on selection.
+Stored stellar parameters are reused; derived values are marked **(est.)** with their source.
+Gaia-only stars use the existing spectral-type/absolute-magnitude model, not measured masses.
+Missing parameters are shown as unavailable.
 
 Select a star to open its details panel, then use **View from** there to place the camera at that
 star and explore the surrounding sky. The details panel also lets you search for a different visible

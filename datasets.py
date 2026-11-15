@@ -583,6 +583,36 @@ class DatasetStore:
         with closing(self.connect()) as db:
             return self._system(db, name)
 
+    def stellar_properties(self, name):
+        with closing(self.connect()) as db:
+            row = db.execute(
+                """SELECT y.lum,y.mass,y.source,y.provenance,y.present
+                   FROM systems y JOIN stars s ON s.id=y.star_id WHERE s.name=?""",
+                (name,),
+            ).fetchone()
+            if row is not None:
+                lum, mass, source, provenance, present = row
+                fields = json.loads(present)
+                return {"name": name, "lum": lum if "lum" in fields else None,
+                        "mass": mass if "mass" in fields else None,
+                        "source": source, "estimated": provenance == "derived",
+                        "dataset_id": self.meta["dataset_id"]}
+            row = db.execute(
+                "SELECT spectral_class,abs_mag,abs_mag_present FROM stars WHERE name=?", (name,)
+            ).fetchone()
+            if row is None and self._has_gaia_stars(db):
+                row = db.execute(
+                    "SELECT spectral_class,abs_mag,1 FROM gaia_stars WHERE name=?", (name,)
+                ).fetchone()
+            if row is None:
+                raise DatasetNotFound(f"No star named '{name}'.")
+            spectral_class, abs_mag, present = row
+            properties = S.star_properties(spectral_class, abs_mag) if present else None
+            return {"name": name, "lum": properties["lum"] if properties else None,
+                    "mass": properties["mass"] if properties else None,
+                    "source": "Spectral type and absolute-magnitude model" if properties else None,
+                    "estimated": True, "dataset_id": self.meta["dataset_id"]}
+
     def refresh(self):
         """Recalculate stored flags from relational inputs after direct SQL edits."""
         with closing(sqlite3.connect(self.path)) as db:

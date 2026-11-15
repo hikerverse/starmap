@@ -39,6 +39,27 @@
         <button id="clear-saved-data" title="Forget saved shapes, filters, view, panels and toggles in this browser and reload with defaults">Clear saved data...</button>
       </div>
     </details>
+    <details id="catalogue-menu">
+      <summary>Catalogue</summary>
+      <div class="menu-commands load-distance">
+        <label for="load-source">Star catalogue
+          <select id="load-source">
+            <option value="hyg">HYG</option>
+            <option value="gaia">GAIA</option>
+            <option value="both">Both</option>
+          </select>
+        </label>
+        <label for="load-distance">Load stars from Sol out to
+          <select id="load-distance">
+            <option value="1000">1 kpc</option>
+            <option value="2000">2 kpc</option>
+            <option value="5000">5 kpc</option>
+          </select>
+        </label>
+        <button id="apply-load-distance" type="button" disabled>Reload catalogue</button>
+        <small id="load-distance-help">Selections are saved. Gaia is a quality-filtered sample.</small>
+      </div>
+    </details>
     <details id="help-menu">
       <summary>Help</summary>
       <div class="menu-commands">
@@ -174,24 +195,6 @@
       <button id="close-controls" type="button" aria-label="Close display controls">Close</button>
     </div>
     <div id="star-count"></div>
-    <div class="load-distance">
-      <label for="load-source">Star catalogue
-        <select id="load-source">
-          <option value="hyg">HYG</option>
-          <option value="gaia">GAIA</option>
-          <option value="both">Both</option>
-        </select>
-      </label>
-      <label for="load-distance">Load stars from Sol out to
-        <select id="load-distance">
-          <option value="1000">1 kpc</option>
-          <option value="2000">2 kpc</option>
-          <option value="5000">5 kpc</option>
-        </select>
-      </label>
-      <button id="apply-load-distance" type="button" disabled>Reload catalogue</button>
-      <small id="load-distance-help">Selections are saved. Gaia is a quality-filtered sample.</small>
-    </div>
     <div class="toolbar">
       <label class="frame-row" title="Galactic: X towards the Galactic Centre, Y towards l = 90&deg;, Z towards the North Galactic Pole (right-handed). Equatorial: J2000, X towards RA 0h, Z towards the North Celestial Pole.">
         Frame <select id="frame-select">
@@ -308,6 +311,8 @@
       <tr><th>Distance from centre</th><td id="d-centre"></td></tr>
       <tr id="row-distref" hidden><th>Distance source</th><td id="d-distref"></td></tr>
       <tr id="row-mass" hidden><th>Mass</th><td id="d-mass"></td></tr>
+      <tr id="row-luminosity" hidden><th>Luminosity</th><td id="d-luminosity"></td></tr>
+      <tr id="row-stellar-source" hidden><th>Stellar properties</th><td id="d-stellar-source"></td></tr>
       <tr id="row-notes" hidden><th>Notes</th><td id="d-notes"></td></tr>
       <tr id="row-planets" hidden><th>Planets</th><td><span id="d-planets"></span><br><button id="view-system" title="Show the planetary system">View system</button></td></tr>
     </table>
@@ -436,7 +441,7 @@
               this uncertain model does not assign individual stars to arms. The checkbox is saved with your view.</dd>
             <dt>Show within</dt><dd>Quickly limit the map to objects within a number of parsecs of the selected star (or the centre when nothing is selected).</dd>
             <dt>View from a star</dt><dd>Select a star and choose <b>View from</b> to place the camera at its catalogue position. Drag to look around and use the wheel to zoom. Set a limiting magnitude or choose a rough dark-sky, binocular or telescope preset. This is an approximate star-only view: the catalogue is incomplete, magnitudes may be estimated, and equipment limits do not model real optics.</dd>
-            <dt>Star catalogue and load radius</dt><dd>Choose HYG, GAIA, or Both, and a radius from Sol (1, 2, or 5 kpc), then reload. These selections are saved. GAIA includes HYG stars matched to Gaia and a quality-filtered sample of Gaia additions. Matched stars retain their HYG positions and planetary systems; additions have no planetary-system data. Some Gaia additions have broad spectral classes estimated from their Gaia temperatures, marked (est.); temperature alone cannot determine luminosity class. Both displays each matched star once. Other object overlays are independent of this selection.</dd>
+            <dt>Star catalogue and load radius</dt><dd>Open <b>Catalogue</b> in the top menu, choose HYG, GAIA, or Both, and a radius from Sol (1, 2, or 5 kpc), then reload. These selections are saved. GAIA includes HYG stars matched to Gaia and a quality-filtered sample of Gaia additions. Matched stars retain their HYG positions and planetary systems; additions have no planetary-system data. Some Gaia additions have broad spectral classes estimated from their Gaia temperatures, marked (est.); temperature alone cannot determine luminosity class. Both displays each matched star once. Other object overlays are independent of this selection.</dd>
             <dt>Subspace disturbance</dt><dd>Open <b>View &rarr; Subspace disturbance...</b> for an optional fictional volumetric field within 1,200 pc of Sol.
               Change <b>Seed</b> or use <b>Regenerate</b> for a different field; the same seed and generation
               version reproduce it. <b>Glow</b> changes appearance only. Cloud brightness accumulates along the
