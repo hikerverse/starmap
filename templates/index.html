@@ -320,9 +320,36 @@
       <tr id="row-luminosity" hidden><th>Luminosity</th><td id="d-luminosity"></td></tr>
       <tr id="row-stellar-source" hidden><th>Stellar properties</th><td id="d-stellar-source"></td></tr>
       <tr id="row-notes" hidden><th>Notes</th><td id="d-notes"></td></tr>
-      <tr id="row-planets" hidden><th>Planets</th><td><span id="d-planets"></span><br><button id="view-system" title="Show the planetary system">View system</button></td></tr>
+      <tr id="row-planets" hidden><th>Planets</th><td><span id="d-planets"></span><br><button id="view-system" title="Show the planetary system">View system</button>
+        <button id="explore-system" type="button" hidden>Explore system</button></td></tr>
     </table>
   </div>
+
+  <section id="system-explorer" hidden role="dialog" aria-modal="true" aria-labelledby="system-explorer-title">
+    <header>
+      <h2 id="system-explorer-title">Explore system</h2>
+      <button id="close-system-explorer" type="button">Return to star map</button>
+    </header>
+    <div class="system-space"><div class="system-body-labels"></div></div>
+    <aside class="system-explorer-controls">
+      <label for="system-scale">Body sizes</label>
+      <select id="system-scale">
+        <option value="enlarged">Enlarged for visibility</option>
+        <option value="true">True physical scale</option>
+      </select>
+      <small>Orbits keep dataset distances. Labels remain selectable at true scale.</small>
+      <button id="fit-system" type="button">Show whole system</button>
+      <button id="focus-system-body" type="button">Centre on selected body</button>
+      <button id="system-information" type="button">System information</button>
+      <div id="system-body-list" aria-label="Star, planets and moons"></div>
+    </aside>
+    <footer>
+      <p id="system-body-details" aria-live="polite"></p>
+      <p id="system-view-distance"></p>
+      <p id="system-explorer-status" role="status"></p>
+      <small>Drag to rotate, scroll/pinch to zoom. Click to select; double-click to centre. Moon systems appear when centred on their planet.</small>
+    </footer>
+  </section>
 
   <div id="system-panel" class="panel hidden">
     <button id="close-system" title="Close">&times;</button>
@@ -495,6 +522,11 @@
           <p>The backend selects the active complete dataset. To switch datasets, change the server database setting, restart the backend and reload this page.
             With <em>Colour by &rarr; Planets</em>, stars are coloured by their planet category and <em>Confirmed planets only</em> hides invented systems.</p>
           <p>Select a star with planets and press <b>View system</b> to see its orbits, habitable zone and planet table.</p>
+          <p><b>Explore system</b> opens a 3D view of its star, planets and individually modelled moons.
+            Click to select, double-click to centre, or use <b>Centre on selected body</b>.
+            Bodies are enlarged by default; choose <b>True physical scale</b> for their stored radii.
+            Orbits use dataset distances but illustrative phases, not a live ephemeris.
+            <b>Return to star map</b> restores the map view.</p>
         </section>
 
         <section id="guide-axes">

@@ -250,4 +250,5 @@ These dependency-free tests require Node.js 22+:
 node --experimental-default-type=module tests\test_subspace.mjs
 node --experimental-default-type=module tests\test_primitive_shapes.mjs
 node --experimental-default-type=module tests\test_filters.mjs
+node --experimental-default-type=module tests\test_system_model.mjs
 ```

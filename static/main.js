@@ -7,6 +7,7 @@ import { createSubspace } from './subspace.js';
 import { disturbanceAt, SUBSPACE_RADIUS_PC } from './subspace-field.js';
 import { createMilkyWay } from './milky-way.js';
 import { createShapeEditor } from './shape-editor.js';
+import { createSystemExplorer } from './system-explorer.js';
 
 // ---------- Tunables ----------
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
@@ -2042,6 +2043,7 @@ guideContent.addEventListener('scroll', highlightGuideSection, { passive: true }
 guideDialog.addEventListener('toggle', highlightGuideSection);
 window.addEventListener('keydown', (e) => {
   if (e.key !== '?' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (systemExplorer.active) return;
   if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
   e.preventDefault();
   openGuide();
@@ -2241,6 +2243,11 @@ searchEl.addEventListener('input', () => {
 });
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (systemExplorer.active) {
+    if (!systemPanel.classList.contains('hidden')) hideSystem();
+    else systemExplorer.close();
+    return;
+  }
   const shapeDialog = document.getElementById('shape-dialog');
   if (shapeDialog.open && shapeDialog.contains(document.activeElement)) { e.preventDefault(); shapeDialog.close(); return; }
   if (aboutDialog.open && aboutDialog.contains(document.activeElement)) { e.preventDefault(); aboutDialog.close(); return; }
@@ -2831,6 +2838,8 @@ function updatePlanetRow(i) {
   }
   const text = document.getElementById('d-planets');
   const button = document.getElementById('view-system');
+  const exploreButton = document.getElementById('explore-system');
+  exploreButton.hidden = datasetLoading || !planetCount || planetCount[i] === 0;
   if (datasetLoading || !planetCount) {
     text.textContent = datasetLoading ? 'loading dataset...' : 'dataset unavailable';
     button.disabled = true;
@@ -2853,6 +2862,53 @@ document.getElementById('close-system').addEventListener('click', hideSystem);
 const systemPanel = document.getElementById('system-panel');
 const systemTitle = document.getElementById('s-title');
 let systemDrag = null;
+let explorerRequest = 0;
+let explorerIndex = -1;
+let explorerInert = [];
+const systemExplorer = createSystemExplorer({
+  root: document.getElementById('system-explorer'),
+  onClose() {
+    explorerRequest++;
+    explorerIndex = -1;
+    hideSystem();
+    document.body.classList.remove('exploring-system');
+    for (const [element, inert] of explorerInert) element.inert = inert;
+    explorerInert = [];
+    controls.enabled = true;
+    controls.listenToKeyEvents(window);
+    document.getElementById('explore-system').focus();
+  },
+  onInformation() { if (explorerIndex >= 0) showSystem(explorerIndex); },
+});
+document.getElementById('explore-system').addEventListener('click', async () => {
+  if (selected < 0 || selected >= systemStarCount || datasetLoading || !activeDataset) return;
+  const index = selected;
+  const request = ++explorerRequest;
+  exitViewFrom();
+  animation = null;
+  hideSystem();
+  explorerIndex = index;
+  controls.enabled = false;
+  controls.stopListenToKeyEvents();
+  explorerInert = [...document.body.children]
+    .filter(element => element.id !== 'system-explorer' && element.id !== 'system-panel'
+      && element.tagName !== 'SCRIPT')
+    .map(element => [element, element.inert]);
+  for (const [element] of explorerInert) element.inert = true;
+  document.body.classList.add('exploring-system');
+  systemExplorer.loading(records[index].name);
+  try {
+    const system = await datasetJson(`/api/system/${encodeURIComponent(records[index].name)}`);
+    if (request !== explorerRequest) return;
+    if (system.dataset_id !== activeDataset.id) throw new Error('System does not match the active dataset');
+    systemExplorer.show(system);
+  } catch (err) {
+    if (request === explorerRequest) {
+      console.error('Could not explore system:', err);
+      systemExplorer.error(err.message);
+    }
+  }
+});
 
 function positionSystemPanel(left, top) {
   const rect = systemPanel.getBoundingClientRect();
@@ -3215,6 +3271,7 @@ function updateCameraInfo() {
 function loop(now) {
   requestAnimationFrame(loop);
   if (!starfieldReady) return;
+  if (systemExplorer.active) return;
   if (!galaxyScale && centre >= 0 && kind[centre] === 0) lastStarCentre = centre;
   stepAnimation(now);
   if (viewFromIndex < 0) controls.update();

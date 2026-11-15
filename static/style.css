@@ -388,6 +388,43 @@ tr[hidden] { display: none; }
 #planet-list li.off { opacity: 0.4; }
 #d-planets { font-size: 12px; }
 #view-system { padding: 1px 6px; font-size: 11px; margin-top: 3px; }
+#explore-system { margin-top: 4px; }
+#explore-system[hidden], #system-explorer[hidden] { display: none; }
+#system-explorer {
+  position: fixed; inset: 0; z-index: 40; background: #030611; color: #dde6ff;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: 220px minmax(0, 1fr);
+}
+#system-explorer header {
+  grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; padding: 10px 14px; background: #0a1020;
+}
+#system-explorer h2 { margin: 0; font-size: 17px; }
+.system-space { position: relative; grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow: hidden; }
+.system-space canvas { display: block; }
+.system-body-labels { position: absolute; inset: 0; pointer-events: none; }
+.system-body-labels button {
+  position: absolute; transform: translate(-50%, -140%); pointer-events: auto;
+  font-size: 11px; padding: 2px 4px; background: rgba(10, 16, 32, 0.7); white-space: nowrap;
+}
+.system-body-labels button[hidden] { display: none; }
+.system-body-labels button.selected { border-color: #ffd27a; color: #ffd27a; }
+.system-explorer-controls { grid-column: 1; grid-row: 2; padding: 10px; overflow-y: auto; background: #0a1020; }
+.system-explorer-controls > * { display: block; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+.system-explorer-controls small { font-size: 11px; opacity: 0.75; }
+#system-body-list { display: flex; flex-direction: column; gap: 4px; }
+#system-body-list button { text-align: left; }
+#system-body-list button[aria-pressed="true"] { border-color: #ffd27a; }
+#system-explorer footer { grid-column: 1 / -1; padding: 8px 14px; background: #0a1020; font-size: 12px; }
+#system-explorer footer p { margin: 0 0 5px; }
+#system-explorer-status { opacity: 0.7; }
+body.exploring-system #system-panel { z-index: 41; max-width: calc(100vw - 32px); }
+@media (max-width: 600px) {
+  #system-explorer { grid-template-columns: 140px minmax(0, 1fr); }
+  #system-explorer header { padding: 8px; }
+  #system-explorer h2 { font-size: 14px; }
+  #system-explorer footer { max-height: 25dvh; overflow-y: auto; padding: 6px; }
+  .system-explorer-controls { padding: 6px; font-size: 12px; }
+}
 #row-planets td { white-space: normal; }
 
 #system-panel {

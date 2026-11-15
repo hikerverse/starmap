@@ -665,6 +665,44 @@ when the page loads.
 
 ## Planetary systems
 
+### Exploring a system in 3D
+
+Select a star with confirmed or simulated planets, then press **Explore system** in its
+details panel. The existing **View system** button still opens the information panel.
+The explorer replaces the map with a dedicated 3D view in astronomical units, preserving
+the map camera and rotation centre for your return.
+
+- Drag to rotate, scroll/pinch to zoom and use right-drag or two fingers to pan.
+- Click a body or its list entry to select it; double-click to centre on it.
+  On touchscreens, select an entry and press **Centre on selected body**.
+- Centre on a planet to see its individually modelled moons and their orbits.
+  Centre on a moon or the host star for a closer view; zoom further to inspect the surface.
+- **Show whole system** fits the full system. **System information** opens the existing
+  planetary data panel above the explorer.
+- **Body sizes** defaults to enlarged bodies for visibility; **True physical scale** uses
+  the stored physical radii. Orbital distances are unchanged in either mode. Enlargement is
+  limited near neighbouring orbits, so not every body is conspicuous at whole-system scale.
+  Labels and the body list still work when a true-scale body is too small to see.
+- **Return to star map** or Escape exits. Closing the system information panel does not
+  close the explorer.
+
+The star's temperature controls its representative colour, and its stored radius reflects
+its stellar category. Procedural surface patterns distinguish rocky terrestrial planets,
+super-Earths, banded gas giants and smoother blue ice giants/sub-Neptunes. The Solar System
+has illustrative Earth oceans/land/clouds, recognisable planet colours and Saturn's rings.
+Moon surfaces are representative rock/ice; outside the Solar System the ice-like appearance
+is inferred from the host planet's position relative to the model snow line, not observed
+moon composition.
+
+Positions use stored planetary semi-major axes and eccentricities, and moon orbital radii.
+Orbital phases are deterministic illustrations with a common orbital plane, not positions
+for the current date, measured orbital orientations or an ephemeris. Bodies are stationary;
+this view does not run an N-body simulation. Surface maps and rings are illustrative,
+not reconstructed observations. Counted minor moons without individual orbital data are
+reported but not invented as additional bodies. Exoplanet moons remain simulated even
+when their host planets are confirmed. Missing or invalid required system data produces
+an explicit loading error rather than invented orbital or size values.
+
 HYG stars have system records (possibly with no planets); Gaia-only additions do not acquire
 invented planetary systems. The application reads a complete SQLite
 dataset rather than regenerating planets during requests. Its normalized tables make star coordinates
