@@ -29,6 +29,11 @@ Open the app in your browser at the address supplied by its operator
 
 Use the top menu's **Catalogue** item to choose HYG, GAIA, or Both and the load radius from Sol
 (1, 2, or 5 kpc), then select **Reload catalogue**. These selections are saved.
+On first load, phone-sized screens default to **HYG within 1 kpc** to reduce loading time
+and memory use; other screens default to **Both within 1 kpc**. Valid saved choices take
+precedence, and phone users can still choose GAIA, Both or a larger radius. Phone-sized means
+a viewport up to 600 px wide, or up to 600 px high with a coarse pointer (landscape touchscreens).
+Resizing does not reload the catalogue. Galaxy and other object overlays still load separately.
 
 The map and planetary systems come from the active standalone SQLite dataset selected by
 the operator. The Catalogue menu selects the star sample within that dataset, not a different
