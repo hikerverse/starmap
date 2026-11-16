@@ -15,6 +15,8 @@ For installation, deployment and data-maintenance commands, see the [README](REA
 - [Getting started](#getting-started)
 - [Data sources and how they are used](#data-sources-and-how-they-are-used)
 - [Controls and navigation](#controls)
+- [Sharing a location or viewpoint](#sharing-a-location-or-viewpoint)
+- [Stellar motion time slider](#stellar-motion-time-slider)
 - [Star data and Gaia techniques](#star-database)
 - [Neutron stars](#neutron-star-database), [black holes](#black-hole-database) and [nebulae](#nebulae)
 - [Galaxies and cross-matching](#extragalactic-objects)
@@ -168,6 +170,98 @@ centre; type in its search box to find stars by name. Click an entry to select i
 it. Drag the panel by its title; close it with **×**, the menu item again, or Escape (the first Escape
 clears a search). The list is only recomputed while the panel is open.
 
+### Stellar motion time slider
+
+Open **View → Stellar motion...**, then check **Enable stellar motion**. This optional mode
+starts off on ordinary visits and downloads measurements only when enabled. Closing the
+settings leaves the mode active; the on-screen banner continues to show the year offset.
+Uncheck **Enable stellar motion** to restore the catalogue positions.
+
+Move the slider or enter a whole-number offset between **-10,000 and +10,000 years from
+J2000 (2000.0)**. Negative offsets go into the past; the epoch output is an astronomical
+decimal year, not a calendar date. **Return to J2000** sets the offset to zero without
+disabling the data-quality markers.
+
+- Solid star markers have a complete velocity. Hollow grey markers identify missing radial
+  velocity or proper motion; the star list uses matching hollow swatches.
+- By default, only complete measured 3D velocities move. Incomplete objects remain at their
+  catalogue positions as placeholders, **not because they are known to be stationary**.
+- **Include tangential-only estimates** moves stars with proper motion but no radial velocity
+  using an explicit zero-radial-velocity assumption. These remain hollow grey: their paths
+  are incomplete estimates, not measured 3D trajectories.
+- Select a star to see its source catalogue/identifier, speed, radial velocity and available
+  errors. A scalar velocity-error displacement grows with the absolute year offset.
+  Missing error measurements are explicitly labelled unavailable.
+- Selection, labels, picking, centring, distance filters and stellar observer views follow
+  the displaced positions. A centred star stays centred as the year changes.
+- Sol is the fixed origin. Compact-object, nebula and galaxy overlays stay at their catalogue
+  positions. Shapes and the fictional subspace layer stay fixed too.
+- **Share view** includes the time offset and partial-motion option. An explicit motion link
+  activates the feature and requires a matching server-side motion sidecar. Ordinary saved
+  camera preferences are translated back to J2000 and do not silently enable motion.
+
+#### Motion measurements and cross-referencing
+
+The motion importer reuses the map's existing, unambiguous Gaia DR3 source-ID associations;
+it does not guess new positional matches against a future epoch. It retrieves `ra`, `dec`,
+`parallax`, `pmra`, `pmdec`, `radial_velocity`, and their available errors from
+`gaiadr3.gaia_source`. Bright quality-selected sources, Hipparcos-cross-matched Gaia sources
+and explicit requests for remaining stored source IDs cover the active catalogue. Independent
+COUNT queries detect truncated downloads.
+
+Original HYG v4.0 rows are matched by unique original J2000 position or unambiguous catalogue
+alias using the existing enrichment matching rules. HYG velocities are used where Gaia has
+no complete velocity and HYG supplies one. Ambiguous matches are not used.
+The two curated long-form names Alpha Centauri A and Epsilon Eridani additionally use
+explicit Hipparcos identifiers HIP 71683 and HIP 16537 (HYG names Rigil Kentaurus and Ran);
+these identifier associations are recorded in the import provenance.
+HYG's derived
+Cartesian velocity columns are **not** evidence of a measured radial velocity: those vectors
+can have been calculated with missing radial motion. Conservatively, zero HYG radial
+velocities and pairs of zero HYG proper motions are treated as unknown; a genuine Gaia
+measurement of zero remains valid. HYG does not provide velocity-error estimates here.
+HYG-derived data retains its [CC BY-SA 4.0 attribution](https://github.com/astronexus/HYG-Database).
+Gaia usage follows the [Gaia data credits](https://www.cosmos.esa.int/web/gaia-users/credits):
+data from ESA's Gaia mission, processed by the Gaia Data Processing and Analysis Consortium
+(DPAC), with funding provided by national institutions participating in the Gaia Multilateral Agreement.
+
+The importer converts proper motions (with `pmra` already including cos declination) and
+radial velocity into an equatorial Cartesian velocity in pc/year. Positions follow
+`p(year) = p(J2000) + v × (year - 2000)`, anchored to the map's existing J2000 coordinates.
+The galactic display applies the same rotation to these displaced positions.
+
+Coverage in the enriched database prepared on 16 November 2026:
+
+| Loaded sample | Stars | Complete velocity / reference | Tangential only | Unavailable |
+| --- | ---: | ---: | ---: | ---: |
+| HYG | 106,714 | 93,617 (87.7%) | 13,096 | 1 |
+| Both within 1 kpc | 651,350 | 603,672 (92.7%) | 47,677 | 1 |
+| Both within 5 kpc | 878,172 | 807,631 (92.0%) | 70,540 | 1 |
+
+The complete/reference column includes Sol's fixed reference vector, not a measured
+zero space velocity. At 5 kpc, 801,753 complete stellar velocities come from Gaia and
+5,877 from HYG. Available Gaia errors support the scalar velocity-error budget for
+801,753 stars; HYG fallback errors are unavailable. Coverage is lower in the immediate
+solar neighbourhood than in the full bright-star sample. The settings report the counts
+for whichever sample is actually loaded.
+
+**Scientific limitations:** this is measured-velocity, straight-line extrapolation, not an
+exact past/future sky or a Galactic-orbit calculation. The map's initial positions/distances
+remain uncertain; Gaia velocities use Gaia distances even where the HYG map position was
+preserved. The underlying barycentric/heliocentric measurements are approximated in a fixed,
+Solar-centred inertial frame. Solar reflex/stellar space motion is retained, but Galactic
+accelerations, binary orbital motion, spectroscopic velocity systematics, light-travel-time
+effects and stellar evolution are not modelled. Planetary-system phases remain illustrative
+and are not advanced with this slider.
+
+Where Gaia supplies errors, the displayed **additional velocity-error displacement** is
+`|year offset| × sigma_velocity`: a quadrature scalar combining proper-motion errors,
+parallax's contribution to tangential speed, and radial-velocity error. It omits covariance,
+initial positional errors and model systematics, and is **not a total positional uncertainty,
+confidence interval or encounter-probability estimate**. A small or missing error budget does
+not make a long extrapolation accurate. Use close-pass trajectories as exploration aids,
+not precision predictions.
+
 ### Saved settings
 
 StarExplorer remembers your session in this browser (`localStorage`, key `starexplorer:prefs:v1`):
@@ -179,6 +273,38 @@ reapplied. Stars and sovereignties are stored by name, and anything invalid or n
 ignored rather than blocking start-up. **View → Clear saved data...** forgets everything and reloads
 with the defaults. Nothing is sent to the server, and if browser storage is disabled the app simply
 starts with defaults each time.
+
+### Sharing a location or viewpoint
+
+Press **Share view** in the top menu, then **Copy link**. The share window also provides a
+selectable link for browsers that do not permit clipboard access. A separate **Share view**
+button in the system explorer shares a planet/moon close-up without leaving the system.
+
+Links restore:
+
+- The loaded HYG/GAIA/Both sample and radius, overriding the recipient's saved choices and
+  phone defaults for that visit.
+- Coordinate frame, map camera position/target/field of view, rotation centre, selected
+  catalogue object and the last star centre used before galaxy-scale zoom.
+- Display toggles, spectral/nebula/planet-category filters, hidden sovereignties, distance
+  limit, advanced filter expression and colour mode.
+- An active **View from** observer, looking direction and limiting magnitude.
+- An enabled stellar-motion time offset and the tangential-only-estimates option.
+- An active **Explore system** host, selected/focused star/planet/moon, camera and body-size
+  mode. System links require the same active planetary dataset on the server.
+
+The settings are encoded in the URL fragment (`#view=...`), not uploaded to a link-shortening
+service. Anyone with the link can read its embedded object names and filters. Links can be
+long, especially with advanced filters. Only share a public/deployed address when sending
+to other people: a `127.0.0.1` link refers to the recipient's own computer.
+
+Opening a link loads the referenced catalogue; it does not bundle observations or simulated
+systems. Missing objects, invalid links or a different planetary dataset produce an explicit
+message. Normal browser settings may be saved as you continue exploring. Panel positions,
+open information windows, primitive-shape annotations and subspace disturbance settings are
+not included. Existing links remain snapshots; later camera changes do not update a link you
+already copied. Opening another shared fragment in the same tab reloads its referenced view.
+Remove the `#view=...` fragment and reload to stop reapplying a shared snapshot.
 
 ### Advanced filters
 

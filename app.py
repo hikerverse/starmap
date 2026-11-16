@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Flask, Response, abort, render_template, request
 
 import datasets
+from stellar_motion import motion_payload
 from query_api import create_query_blueprint
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -38,6 +39,7 @@ SOVEREIGNTIES_FILE = BASE_DIR / "data" / "sovereignties.json"
 NEBULAE_FILE = DATA_DIR / "nebulae.json"
 NEBULA_TYPES = {"emission", "reflection", "planetary", "snr", "dark"}
 GALAXIES_FILE = DATA_DIR / "galaxies.json"
+MOTION_FILE = DATA_DIR / "stellar-motion.sqlite"
 GALAXY_TYPES = {"spiral", "elliptical", "irregular", "dwarf", "interacting", "peculiar", "active", "cluster"}
 
 REQUIRED_FIELDS = {"name": str, "x": (int, float), "y": (int, float), "z": (int, float),
@@ -277,6 +279,29 @@ def gzip_response(raw: bytes, compressed: bytes) -> Response:
         resp = Response(raw, mimetype="application/json")
     resp.headers["Vary"] = "Accept-Encoding"
     return resp
+
+
+@lru_cache(maxsize=1)
+def stellar_motion_payload(path, dataset_mtime, motion_mtime, radius, source):
+    payload = motion_payload(datasets.DatasetStore(Path(path)), MOTION_FILE.resolve(), radius, source)
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return raw, gzip.compress(raw, compresslevel=6)
+
+
+@app.route("/api/stellar-motion")
+def api_stellar_motion():
+    radius, source = catalogue_options()
+    try:
+        raw, compressed = stellar_motion_payload(
+            str(DATASET_FILE), DATASET_FILE.stat().st_mtime_ns, MOTION_FILE.stat().st_mtime_ns, radius, source)
+        response = gzip_response(raw, compressed)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+    except (OSError, ValueError, KeyError, sqlite3.Error) as exc:
+        app.logger.warning("Stellar motion unavailable: %s", exc)
+        return Response(json.dumps({"error": "Measured stellar motion data is unavailable or does not match the active dataset. "
+                                    "Run tools/import_stellar_motion.py for the active database."}),
+                        status=503, mimetype="application/json")
 
 
 @app.route("/api/systems-summary")

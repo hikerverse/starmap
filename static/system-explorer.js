@@ -251,6 +251,29 @@ export function createSystemExplorer({ root, onClose, onInformation }) {
 
   return {
     get active() { return active; },
+    snapshot() {
+      if (!system) throw new Error('Wait for the system to finish loading before sharing');
+      return { name: system.name, body: bodies[selected].name,
+        focus: focused >= 0 ? bodies[focused].name : null,
+        scale: scale.value, position: camera.position.toArray(), target: controls.target.toArray() };
+    },
+    restore(state) {
+      const selectedIndex = bodies.findIndex(b => b.name === state.body);
+      const focusIndex = state.focus === null ? -1 : bodies.findIndex(b => b.name === state.focus);
+      if (selectedIndex < 0 || (state.focus !== null && focusIndex < 0)) {
+        throw new Error('The shared planet or moon is not available in this system');
+      }
+      if (focusIndex >= 0) focus(focusIndex);
+      select(selectedIndex);
+      focused = focusIndex;
+      scale.value = state.scale;
+      camera.position.fromArray(state.position);
+      controls.target.fromArray(state.target);
+      controls.maxDistance = Math.max(controls.maxDistance, camera.position.distanceTo(controls.target) * 2);
+      camera.far = Math.max(camera.far, controls.maxDistance * 2);
+      camera.updateProjectionMatrix();
+      controls.update();
+    },
     close,
     loading(name) {
       cancelAnimationFrame(frame);

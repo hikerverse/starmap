@@ -153,6 +153,38 @@ See [Gaia matching](USER_GUIDE.md#enriching-the-star-database-with-gaia-dr3),
 [sample selection](USER_GUIDE.md#adding-gaia-dr3-stars) and
 [spectral estimates](USER_GUIDE.md#estimating-gaia-spectral-classes).
 
+### Measured stellar motion (optional)
+
+Build the motion sidecar for the active database:
+
+```powershell
+.\.venv\Scripts\python tools\import_stellar_motion.py `
+  data\stars-gaia-temperatures.sqlite data\stellar-motion.sqlite
+```
+
+The importer downloads public Gaia DR3 astrometry, radial velocities and their errors, then
+cross-references the Gaia source IDs already associated with the map. Unique original HYG
+position/name matches supply fallback velocities. It never changes the active stellar or
+planetary database. The ignored `data\stellar-motion.sqlite` must be deployed alongside it;
+the sidecar is tied to its dataset ID. After replacing/cloning the active database, rebuild
+the sidecar to a new destination and deploy that matching pair. Existing outputs are not
+overwritten.
+
+Downloads are cached in the system temporary directory `starexplorer-motion` (override with
+`--cache`). Archive results are split into brightness batches and checked against separate
+COUNT queries before publication; an interrupted/truncated response cannot silently reduce
+coverage. If a response is reported as truncated, remove only that named cache CSV and rerun.
+Source IDs, measurement values, available errors, source catalogue and import provenance
+remain in the sidecar's `motion` and `metadata` tables.
+
+The browser does not request motion data on ordinary visits or merely opening the settings.
+**View → Stellar motion... → Enable stellar motion** downloads only the loaded star sample.
+See [motion controls and scientific limitations](USER_GUIDE.md#stellar-motion-time-slider).
+
+```powershell
+.\.venv\Scripts\python -m unittest tests.test_stellar_motion tests.test_datasets
+```
+
 ### Compact-object and nebula overlays
 
 ```powershell
@@ -235,12 +267,20 @@ See [observations, simulation and limitations](USER_GUIDE.md#planetary-systems).
 - `/api/systems-summary`: compact planet counts and system flags.
 - `/api/system/<star name>`: a system with planets and moons from normalized rows.
 - `/api/star-properties/<star name>`: stellar mass/luminosity, source and estimate status.
+- `/api/stellar-motion?source=both&max_distance_pc=1000`: lazy-loaded velocity measurements
+  for the selected catalogue, reference epoch, source IDs, provenance and completeness counts.
+  Rows follow the star catalogue order, verified by dataset ID, total count and names CRC.
+  A measurement is `null`, or `[vx,vy,vz,full,sigma,rv,rv_error,source_index,source_id]`;
+  velocities and scalar velocity error are pc/year, radial velocities/errors km/s.
+  Source indices reference the response's `sources` array. Missing values are `null`, not zero.
 - `/api/neutron-stars`, `/api/black-holes`, `/api/nebulae`: separate object overlays.
 - `/api/galaxies`: combined curated/OpenNGC/HIZOA catalogue, sources and import counts.
 - `/api/query/stars/within`: stars within a radius of an arbitrary coordinate.
 - `/api/query/stars/nearest`: nearest stars to an arbitrary coordinate.
 - `/api/query/stars/<name>/within`: stars within a radius of a named star.
 - `/api/query/distance`: exact distance between named stars or stable IDs.
+
+The query endpoints use the stored J2000 coordinates, not a browser's optional motion epoch.
 
 ## Focused frontend tests
 
@@ -251,4 +291,6 @@ node --experimental-default-type=module tests\test_subspace.mjs
 node --experimental-default-type=module tests\test_primitive_shapes.mjs
 node --experimental-default-type=module tests\test_filters.mjs
 node --experimental-default-type=module tests\test_system_model.mjs
+node --experimental-default-type=module tests\test_share_view.mjs
+node --experimental-default-type=module tests\test_stellar_motion.mjs
 ```

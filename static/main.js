@@ -8,6 +8,8 @@ import { disturbanceAt, SUBSPACE_RADIUS_PC } from './subspace-field.js';
 import { createMilkyWay } from './milky-way.js';
 import { createShapeEditor } from './shape-editor.js';
 import { createSystemExplorer } from './system-explorer.js';
+import { sharedViewFromHash, sharedViewUrl } from './share-view.js';
+import { validateMotion, applyMotionPositions, motionDescription, MOTION_LIMIT_YEARS } from './stellar-motion.js';
 
 // ---------- Tunables ----------
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
@@ -267,6 +269,20 @@ let N = 0;
 let milkyWayIndex = -1;
 let galaxyScale = false;
 let lastStarCentre = -1;
+let catalogueDatasetId = null;
+let motionData = null;
+let motionEnabled = false;
+let motionYears = 0;
+let motionBase = null;
+let motionKnownAttr = null;
+let motionLoading = null;
+const motionDialog = document.getElementById('motion-dialog');
+const motionToggle = document.getElementById('toggle-motion');
+const motionPartial = document.getElementById('motion-partial');
+const motionSlider = document.getElementById('motion-years');
+const motionOffset = document.getElementById('motion-offset');
+const motionError = document.getElementById('motion-error');
+const motionOpen = document.getElementById('open-motion');
 let galaxyBounds;
 let starfieldReady = false;
 let records = [];          // original JSON objects
@@ -372,6 +388,7 @@ const isCompactSpecial = (i) => kind[i] === KIND_NEUTRON || kind[i] === KIND_BLA
 const starSizePx = (i, dist) =>
   pointSizePx(appMagAt(absMag[i], dist), dist, kind[i], sovState[i] === SOV_MEMBER ? SOV_MEMBER_MIN_PX : 0);
 function displayColour(i) {
+  if (motionEnabled && kind[i] === 0 && !motionData.measurements[i]?.[3]) return '#87909e';
   if (colourMode === 'planets' && planetCat && planetCat[i] >= 0) return PLANET_CATS[planetCat[i]].colour;
   if (colourMode !== 'sovereignty') return records[i].colour;
   return sovOf[i] >= 0 ? sovereignties[sovOf[i]].colour : UNCLAIMED_COLOUR;
@@ -392,6 +409,7 @@ const starMaterial = new THREE.ShaderMaterial({
     uShowNebula: { value: 1.0 },
     uShowGalaxy: { value: 0.0 },
     uViewFromEnabled: { value: 0.0 },
+    uMotionEnabled: { value: 0.0 },
     uLimitingMagnitude: { value: 6.5 },
     uNebTypeVisible: { value: NEB_TYPES.map(() => 1.0) },
     uFilterCentre: { value: filterCentre },
@@ -407,6 +425,8 @@ const starMaterial = new THREE.ShaderMaterial({
     attribute float filterVisible;
     attribute float observerStar;
     attribute float homeGalaxy;
+    attribute float motionKnown;
+    uniform float uMotionEnabled;
     uniform float uShowHomeGalaxy;
     uniform float uGalaxyScale;
     uniform float uClassVisible[${SPEC_CLASSES.length}];
@@ -424,8 +444,10 @@ const starMaterial = new THREE.ShaderMaterial({
     varying vec3 vColor;
     varying float vAlpha;
     varying float vKind;
+    varying float vIncomplete;
     void main() {
       vKind = kind;
+      vIncomplete = uMotionEnabled > 0.5 && kind < 0.5 && motionKnown < 0.5 ? 1.0 : 0.0;
       bool isNebula = kind > 2.5 && kind < 3.5;
       bool isGalaxy = kind > 3.5;
       if ((uGalaxyScale > 0.5 && !isGalaxy) || (homeGalaxy > 0.5 && uShowHomeGalaxy < 0.5) || filterVisible < 0.5 || (kind < 0.5 && uShowStar < 0.5) || (kind > 0.5 && kind < 1.5 && uShowNeutron < 0.5)
@@ -461,6 +483,7 @@ const starMaterial = new THREE.ShaderMaterial({
         vAlpha = max(vAlpha, 0.9);
       }
       vColor = starColor;
+      if (uMotionEnabled > 0.5 && kind < 0.5 && motionKnown < 0.5) vColor = vec3(0.53, 0.56, 0.62);
       gl_PointSize = size * uPixelRatio;
       gl_Position = projectionMatrix * mv;
     }`,
@@ -468,10 +491,16 @@ const starMaterial = new THREE.ShaderMaterial({
     varying vec3 vColor;
     varying float vAlpha;
     varying float vKind;
+    varying float vIncomplete;
     void main() {
       vec2 c = (gl_PointCoord - 0.5) * 2.0;
       float r = length(c);
       if (r > 1.0) discard;
+      if (vIncomplete > 0.5) {
+        float ring = 1.0 - smoothstep(0.08, 0.24, abs(r - 0.7));
+        gl_FragColor = vec4(vColor, ring * vAlpha);
+        return;
+      }
       if (vKind > 3.5) {
         // Galaxy marker: tilted elliptical glow with a bright nucleus and a faint disc rim
         vec2 q = mat2(0.866, 0.5, -0.5, 0.866) * c;
@@ -548,6 +577,8 @@ function buildPoints() {
   const homeGalaxy = new Float32Array(N);
   homeGalaxy[milkyWayIndex] = 1;
   geo.setAttribute('homeGalaxy', new THREE.BufferAttribute(homeGalaxy, 1));
+  motionKnownAttr = new THREE.BufferAttribute(new Float32Array(N).fill(1), 1);
+  geo.setAttribute('motionKnown', motionKnownAttr);
   geo.computeBoundingSphere();
   const points = new THREE.Points(geo, starMaterial);
   points.frustumCulled = false;
@@ -1214,6 +1245,10 @@ function renderList() {
     const sw = document.createElement('span');
     sw.className = 'swatch';
     sw.style.background = sw.style.color = displayColour(i);
+    if (motionEnabled && kind[i] === 0 && !motionData.measurements[i]?.[3]) {
+      sw.classList.add('motion-incomplete');
+      li.title = motionData.measurements[i] ? 'Incomplete motion: radial velocity unknown' : 'Stellar motion unavailable';
+    }
     if (kind[i] === KIND_BLACK_HOLE && colourMode !== 'spectral') sw.style.borderColor = displayColour(i);
     const nm = document.createElement('span');
     nm.className = 'name';
@@ -1393,6 +1428,7 @@ function selectStar(i) {
   document.getElementById('row-absmag').hidden = isNebula || (isGalaxy && typeof d.abs_mag !== 'number');
   document.getElementById('h-absmag').textContent = isGalaxy ? 'Absolute magnitude (V, approx.)' : 'Absolute magnitude';
   updatePlanetRow(i);
+  updateMotionDetails();
   updateStellarProperties(i);
   const tag = frame === 'galactic' ? 'gal' : 'eq';
   for (const [k, v] of [['x', p.x], ['y', p.y], ['z', p.z]]) {
@@ -2255,6 +2291,7 @@ window.addEventListener('keydown', (e) => {
   const filterDialog = document.getElementById('filter-dialog');
   if (filterDialog.open) { filterDialog.close(); return; }
   if (subspaceDialog.open) { e.preventDefault(); subspaceDialog.close(); return; }
+  if (motionDialog.open) { e.preventDefault(); motionDialog.close(); return; }
   if (shapeDialog.open) { e.preventDefault(); shapeDialog.close(); return; }
   const openMenu = topMenus.find((menu) => menu.open);
   if (openMenu) { openMenu.open = false; return; }
@@ -2291,7 +2328,7 @@ window.addEventListener('resize', () => {
 async function init() {
   updateLoading('Preparing catalogue...', 'Server processing.');
   document.getElementById('centre-info').textContent = 'Loading stars…';
-  const prefs = loadPrefs();
+  const prefs = sharedView ? sharedView.settings : loadPrefs();
   const savedRadius = Number(prefs.loadRadiusPc);
   const loadRadiusPc = [1000, 2000, 5000].includes(savedRadius) ? savedRadius : 1000;
   const phoneLayout = window.matchMedia('(max-width: 600px), (max-height: 600px) and (pointer: coarse)').matches;
@@ -2315,6 +2352,7 @@ async function init() {
   updateLoading('Loading object overlays...', 'Reading nebulae, galaxies and other objects.');
   await yieldLoading();
   catalogueFingerprint = db.catalogue_fingerprint;
+  catalogueDatasetId = db.dataset_id;
   records = db.stars.slice();
   const actualLoadRadius = db.load_radius_pc ?? loadRadiusPc;
   document.getElementById('load-distance').value = String(actualLoadRadius);
@@ -2415,7 +2453,13 @@ async function init() {
 
   resetView(true);
   stepAnimation(performance.now());
-  restorePrefs();
+  restorePrefs(sharedView ? { ...sharedView.settings, camera: sharedView.camera } : loadPrefs());
+  if (sharedView) {
+    camera.fov = sharedView.camera.fov;
+    camera.updateProjectionMatrix();
+    lastStarCentre = records.findIndex((r, i) => kind[i] === 0 && r.name === sharedView.lastStarCentre);
+    updateGalaxyScale(true);
+  }
   if (actualLoadRadius !== loadRadiusPc) {
     savePrefs(savedState, 0);
     flushPrefs();
@@ -2426,7 +2470,12 @@ async function init() {
   if (pendingFilterText || pendingColourMode) {
     updateLoading('Loading planetary systems...', 'Waiting for data needed by your saved view.');
   }
-  loadDataset();
+  document.getElementById('share-view').disabled = false;
+  motionOpen.disabled = false;
+  if (sharedView) {
+    await loadDataset();
+    await restoreSharedLocation();
+  } else loadDataset();
   // Saved state that needs the planets dataset keeps the overlay up until loadDataset settles
   if (!pendingFilterText && !pendingColourMode) finishLoading();
 }
@@ -2504,7 +2553,286 @@ function finishLoading() {
   loadingFinishing = true;
 }
 
+// ---------- Opt-in measured stellar motion ----------
+motionOpen.addEventListener('click', () => {
+  document.getElementById('view-menu').open = false;
+  if (!motionDialog.open) motionDialog.show();
+  motionOpen.setAttribute('aria-expanded', 'true');
+  motionToggle.focus();
+});
+document.getElementById('close-motion').addEventListener('click', () => motionDialog.close());
+motionDialog.addEventListener('close', () => {
+  motionOpen.setAttribute('aria-expanded', 'false');
+  motionOpen.focus();
+});
+
+function loadedNamesCrc() {
+  let crc = 0xffffffff;
+  const encoder = new TextEncoder();
+  for (let i = 0; i < firstSpecial; i++) {
+    for (const byte of encoder.encode(`${i ? '\n' : ''}${records[i].name}`)) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+async function loadMotion() {
+  if (motionData) return;
+  if (motionLoading) return motionLoading;
+  motionLoading = (async () => {
+    document.getElementById('motion-status').textContent = 'Downloading and checking measured velocities...';
+    const query = new URLSearchParams({ max_distance_pc: String(loadedRadiusPc), source: loadedSource });
+    const data = await datasetJson(`/api/stellar-motion?${query}`);
+    motionData = validateMotion(data, firstSpecial, catalogueDatasetId, loadedNamesCrc());
+    motionBase = new Float64Array(3 * firstSpecial);
+    for (let i = 0; i < firstSpecial; i++) {
+      const r = records[i];
+      motionBase.set([r.x, r.y, r.z], 3 * i);
+      motionKnownAttr.array[i] = motionData.measurements[i]?.[3] ? 1 : 0;
+    }
+    motionKnownAttr.needsUpdate = true;
+    document.getElementById('motion-status').textContent =
+      `${data.complete.toLocaleString()} complete 3D velocities; ${data.partial.toLocaleString()} tangential only; `
+      + `${(firstSpecial - data.complete - data.partial).toLocaleString()} unavailable (loaded sample).`;
+  })();
+  try { await motionLoading; }
+  finally { motionLoading = null; }
+}
+
+function updateMotionDetails() {
+  const row = document.getElementById('row-motion');
+  row.hidden = !motionEnabled || selected < 0 || kind[selected] !== 0;
+  if (row.hidden) return;
+  const measurement = motionData.measurements[selected];
+  document.getElementById('d-motion').textContent = motionDescription(
+    measurement, motionYears, motionPartial.checked, measurement ? motionData.sources[measurement[7]] : '');
+}
+
+function applyMotion(enabled, years = motionYears) {
+  if (!Number.isFinite(years) || Math.abs(years) > MOTION_LIMIT_YEARS) {
+    throw new Error('Choose an offset within 10,000 years of J2000.');
+  }
+  if (animation) stepAnimation(animation.start + FOCUS_DURATION_MS);
+  const previous = centre >= 0 ? starPos(centre) : null;
+  const returnCentre = viewFromState?.centre;
+  const previousReturn = returnCentre >= 0 ? starPos(returnCentre) : null;
+  motionEnabled = enabled;
+  motionYears = years;
+  motionToggle.checked = enabled;
+  applyMotionPositions(records, motionBase, motionData.measurements, years, enabled, motionPartial.checked);
+  const vector = new THREE.Vector3();
+  for (let i = 0; i < firstSpecial; i++) {
+    const r = records[i], j = 3 * i;
+    vector.set(r.x, r.y, r.z);
+    if (frame === 'galactic') vector.applyMatrix3(EQ_TO_GAL);
+    vector.toArray(pos, j);
+  }
+  positionAttr.needsUpdate = true;
+  starMaterial.uniforms.uMotionEnabled.value = enabled ? 1 : 0;
+  if (previousReturn) {
+    const delta = starPos(returnCentre).sub(previousReturn);
+    viewFromState.camera.add(delta);
+    viewFromState.target.add(delta);
+  }
+  if (viewFromIndex >= 0) {
+    const priorSelection = selected;
+    setViewFromStar(viewFromIndex);
+    selectStar(priorSelection);
+    if (selected === viewFromIndex) selectionRing.visible = false;
+  } else if (previous) {
+    const delta = starPos(centre).sub(previous);
+    camera.position.add(delta);
+    controls.target.add(delta);
+    controls.update();
+  }
+  if (selected >= 0) starPos(selected, selectionRing.position);
+  selectedDrop.set(selected);
+  centreDrop.set(centre);
+  computeBounds();
+  refreshAdvancedMask();
+  updateFilter(true);
+  if (selected >= 0 && selected !== viewFromIndex && isHidden(selected)) selectStar(-1);
+  refreshViewFromResults();
+  updateCentreInfo();
+  if (selected >= 0) {
+    const p = starPos(selected);
+    for (const [k, v] of [['x', p.x], ['y', p.y], ['z', p.z]]) document.getElementById(`d-${k}`).textContent = fmtLarge(v);
+    document.getElementById('d-dist').textContent = formatDistance(p.length());
+    const gal = frame === 'galactic' ? p : p.applyMatrix3(EQ_TO_GAL);
+    document.getElementById('d-galactic').textContent = gal.length() > 0
+      ? `${((THREE.MathUtils.radToDeg(Math.atan2(gal.y, gal.x)) + 360) % 360).toFixed(3)}°, ${THREE.MathUtils.radToDeg(Math.asin(gal.z / gal.length())).toFixed(3)}°`
+      : '—';
+  }
+  updateMotionDetails();
+  labelsDirty = true;
+  document.getElementById('motion-controls').disabled = !enabled;
+  motionSlider.value = motionOffset.value = String(years);
+  document.getElementById('motion-epoch').value = `Epoch ${(2000 + years).toFixed(1)} (${years >= 0 ? '+' : ''}${years.toLocaleString()} yr from J2000)`;
+  const banner = document.getElementById('motion-banner');
+  banner.hidden = !enabled;
+  banner.textContent = `Stellar motion: J2000 ${years >= 0 ? '+' : ''}${years.toLocaleString()} yr | ${motionPartial.checked ? 'Includes incomplete estimates' : 'Measured 3D velocities only'} | Hollow grey = incomplete data`;
+}
+
+async function enableMotion(enabled) {
+  motionError.textContent = '';
+  motionToggle.disabled = true;
+  try {
+    if (enabled) await loadMotion();
+    if (motionData) applyMotion(enabled);
+    return true;
+  } catch (err) {
+    console.error('Stellar motion failed:', err);
+    motionToggle.checked = motionEnabled;
+    document.getElementById('motion-status').textContent = 'Stellar motion unavailable.';
+    motionError.textContent = err.message;
+    return false;
+  } finally { motionToggle.disabled = false; }
+}
+motionToggle.addEventListener('change', () => enableMotion(motionToggle.checked));
+function applyMotionOffset() {
+  if (!motionEnabled) return;
+  const value = Number(motionOffset.value);
+  if (!motionOffset.value || !motionOffset.checkValidity()) { motionOffset.reportValidity(); return; }
+  motionError.textContent = '';
+  applyMotion(true, value);
+}
+motionOffset.addEventListener('change', applyMotionOffset);
+let motionFrame = null;
+motionSlider.addEventListener('input', () => {
+  motionOffset.value = motionSlider.value;
+  if (motionFrame !== null) return;
+  motionFrame = requestAnimationFrame(() => { motionFrame = null; applyMotionOffset(); });
+});
+motionPartial.addEventListener('change', () => applyMotion(motionEnabled));
+document.getElementById('motion-reset').addEventListener('click', () => applyMotion(motionEnabled, 0));
+
 // ---------- Saved settings (localStorage) ----------
+let sharedView = null;
+window.addEventListener('hashchange', () => {
+  if (new URLSearchParams(window.location.hash.slice(1)).has('view')) window.location.reload();
+});
+try {
+  sharedView = sharedViewFromHash(window.location.hash);
+} catch (err) {
+  console.error('Could not read shared view:', err);
+  showShareMessage(`Could not open shared view: ${err.message}`);
+}
+
+function showShareMessage(message, url = '') {
+  const dialog = document.getElementById('share-dialog');
+  document.getElementById('share-message').textContent = message;
+  document.getElementById('share-url').value = url;
+  document.getElementById('copy-share-url').disabled = !url;
+  dialog.inert = false;
+  if (!dialog.open) dialog.showModal();
+}
+
+function shareCurrentView() {
+  try {
+    const state = savedState();
+    state.loadSource = loadedSource;
+    state.loadRadiusPc = loadedRadiusPc;
+    const mapCamera = viewFromState ? {
+      position: viewFromState.camera.toArray(), target: viewFromState.target.toArray(),
+      centre: viewFromState.centre >= 0 ? records[viewFromState.centre].name : null,
+      fov: viewFromState.fov,
+    } : { ...state.camera, fov: camera.fov };
+    const view = {
+      version: 1, settings: state, camera: mapCamera,
+      selected: selected >= 0 ? records[selected].name : null,
+      lastStarCentre: lastStarCentre >= 0 ? records[lastStarCentre].name : null,
+    };
+    if (motionEnabled) {
+      view.camera = { position: camera.position.toArray(), target: controls.target.toArray(),
+        centre: centre >= 0 ? records[centre].name : null, fov: camera.fov };
+      if (viewFromState) view.camera = mapCamera;
+      view.motion = { years: motionYears, partial: motionPartial.checked };
+    }
+    if (viewFromIndex >= 0) view.observer = {
+      name: records[viewFromIndex].name, direction: camera.getWorldDirection(new THREE.Vector3()).toArray(),
+      magnitude: Number(viewFromMagnitude.value), fov: camera.fov,
+    };
+    if (systemExplorer.active) {
+      view.system = { ...systemExplorer.snapshot(), dataset: activeDataset.id };
+    }
+    const url = sharedViewUrl(window.location.href, view);
+    showShareMessage('Copy this link to reopen the view. Anyone with the link can read its location and filter settings.', url);
+    document.getElementById('share-url').select();
+  } catch (err) {
+    console.error('Could not share view:', err);
+    showShareMessage(`Could not share view: ${err.message}`);
+  }
+}
+document.getElementById('share-view').addEventListener('click', shareCurrentView);
+document.getElementById('share-system-view').addEventListener('click', shareCurrentView);
+document.getElementById('close-share').addEventListener('click', () => document.getElementById('share-dialog').close());
+document.getElementById('share-dialog').addEventListener('keydown', event => event.stopPropagation());
+document.getElementById('copy-share-url').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById('share-url').value);
+    document.getElementById('share-message').textContent = 'Link copied.';
+  } catch (err) {
+    console.warn('Clipboard copy unavailable:', err);
+    document.getElementById('share-message').textContent = 'Clipboard unavailable. Select the link and copy it manually.';
+    document.getElementById('share-url').select();
+  }
+});
+
+async function restoreSharedLocation() {
+  try {
+    if (sharedView.motion) {
+      motionPartial.checked = sharedView.motion.partial;
+      motionYears = sharedView.motion.years;
+      if (!await enableMotion(true)) throw new Error(motionError.textContent);
+      camera.position.fromArray(sharedView.camera.position);
+      controls.target.fromArray(sharedView.camera.target);
+      controls.update();
+      centre = records.findIndex(r => r.name === sharedView.camera.centre);
+      if (centre >= 0 && starPos(centre).distanceTo(controls.target) > 1e-3) centre = -1;
+      updateCentreInfo();
+    }
+    parseFilter(sharedView.settings.filter, filterLookups());
+    const find = name => {
+      const index = records.findIndex(r => r.name === name);
+      if (index < 0) throw new Error(`Object not available in this catalogue: ${name}`);
+      return index;
+    };
+    if (sharedView.camera.centre) find(sharedView.camera.centre);
+    if (sharedView.lastStarCentre && kind[find(sharedView.lastStarCentre)] !== 0) {
+      throw new Error('Shared previous star centre is not a star');
+    }
+    if (sharedView.observer) {
+      const observer = sharedView.observer;
+      const index = find(observer.name);
+      if (kind[index] !== 0) throw new Error('Shared observer is not a star');
+      viewFromMagnitude.value = String(observer.magnitude);
+      viewFromPreset.value = 'custom';
+      setViewFromStar(index);
+      const direction = new THREE.Vector3(...observer.direction).normalize();
+      controls.target.copy(camera.position).add(direction);
+      camera.lookAt(controls.target);
+      camera.fov = observer.fov;
+      camera.updateProjectionMatrix();
+    }
+    selectStar(sharedView.selected ? find(sharedView.selected) : -1);
+    if (viewFromIndex >= 0 && selected === viewFromIndex) selectionRing.visible = false;
+    if (sharedView.system) {
+      const system = sharedView.system;
+      if (!activeDataset || datasetLoading) throw new Error('Planetary dataset is unavailable');
+      if (system.dataset !== activeDataset.id) throw new Error('The shared planetary dataset is not active on this server');
+      const index = find(system.name);
+      if (index >= systemStarCount || !planetCount[index]) throw new Error('Shared system has no available planets');
+      selectStar(index);
+      await exploreSystem(index, system);
+    }
+  } catch (err) {
+    console.error('Could not restore shared location:', err);
+    showShareMessage(`Shared view could not be fully opened: ${err.message}`);
+  }
+}
+
 const SAVED_TOGGLES = ['toggle-grid', 'toggle-labels', 'toggle-stars', 'toggle-neutron', 'toggle-blackhole',
   'toggle-nebula', 'toggle-milky-way', 'toggle-galaxy', 'toggle-unclaimed', 'toggle-confirmed'];
 let restoring = false;
@@ -2515,6 +2843,16 @@ function filterLookups() {
 
 function savedState() {
   const panel = starPanel.style.left ? { left: parseFloat(starPanel.style.left), top: parseFloat(starPanel.style.top) } : null;
+  const cameraState = { target: controls.target.toArray(), position: camera.position.toArray(),
+    centre: centre >= 0 ? records[centre].name : null };
+  // Ordinary preferences reopen at J2000; only an explicit shared link activates motion.
+  if (motionEnabled && centre >= 0 && centre < firstSpecial) {
+    const r = records[centre], j = 3 * centre;
+    const delta = new THREE.Vector3(r.x - motionBase[j], r.y - motionBase[j + 1], r.z - motionBase[j + 2]);
+    if (frame === 'galactic') delta.applyMatrix3(EQ_TO_GAL);
+    cameraState.position = camera.position.clone().sub(delta).toArray();
+    cameraState.target = controls.target.clone().sub(delta).toArray();
+  }
   return {
     frame,
     colourMode: pendingColourMode ?? colourMode,
@@ -2527,11 +2865,7 @@ function savedState() {
     loadRadiusPc: Number(document.getElementById('load-distance').value),
     loadSource: loadSourceSelect.value,
     filter: pendingFilterText ?? serializeFilter(advancedFilter, filterGalaxies, filterLookups()),
-    camera: {
-      target: controls.target.toArray(),
-      position: camera.position.toArray(),
-      centre: centre >= 0 ? records[centre].name : null,
-    },
+    camera: cameraState,
     starPanel: { open: !starPanel.classList.contains('hidden'), ...panel },
     guide: guideState(),
     subspace: subspace.settings,
@@ -2565,8 +2899,7 @@ function applyPendingFilter() {
 }
 
 // Each part is validated separately so one stale or corrupt value can't block the rest
-function restorePrefs() {
-  const prefs = loadPrefs();
+function restorePrefs(prefs) {
   restoring = true;
   try {
     if (prefs.shapes !== undefined) shapeEditor.restore(prefs.shapes);
@@ -2621,7 +2954,7 @@ function restorePrefs() {
       controls.target.fromArray(cam.target);
       camera.position.fromArray(cam.position);
       controls.update();
-      const index = typeof cam.centre === 'string' ? records.findIndex((r, i) => i < firstSpecial && r.name === cam.centre) : -1;
+      const index = typeof cam.centre === 'string' ? records.findIndex(r => r.name === cam.centre) : -1;
       centre = index >= 0 && starPos(index).distanceTo(controls.target) < 1e-3 ? index : -1;
       updateCentreInfo();
     }
@@ -2880,9 +3213,9 @@ const systemExplorer = createSystemExplorer({
   },
   onInformation() { if (explorerIndex >= 0) showSystem(explorerIndex); },
 });
-document.getElementById('explore-system').addEventListener('click', async () => {
-  if (selected < 0 || selected >= systemStarCount || datasetLoading || !activeDataset) return;
-  const index = selected;
+document.getElementById('explore-system').addEventListener('click', () => exploreSystem(selected));
+async function exploreSystem(index, sharedSystem = null) {
+  if (index < 0 || index >= systemStarCount || datasetLoading || !activeDataset) return;
   const request = ++explorerRequest;
   exitViewFrom();
   animation = null;
@@ -2892,6 +3225,7 @@ document.getElementById('explore-system').addEventListener('click', async () => 
   controls.stopListenToKeyEvents();
   explorerInert = [...document.body.children]
     .filter(element => element.id !== 'system-explorer' && element.id !== 'system-panel'
+      && element.id !== 'share-dialog'
       && element.tagName !== 'SCRIPT')
     .map(element => [element, element.inert]);
   for (const [element] of explorerInert) element.inert = true;
@@ -2902,13 +3236,14 @@ document.getElementById('explore-system').addEventListener('click', async () => 
     if (request !== explorerRequest) return;
     if (system.dataset_id !== activeDataset.id) throw new Error('System does not match the active dataset');
     systemExplorer.show(system);
+    if (sharedSystem) systemExplorer.restore(sharedSystem);
   } catch (err) {
     if (request === explorerRequest) {
       console.error('Could not explore system:', err);
       systemExplorer.error(err.message);
     }
   }
-});
+}
 
 function positionSystemPanel(left, top) {
   const rect = systemPanel.getBoundingClientRect();
@@ -3268,30 +3603,24 @@ function updateCameraInfo() {
   }
 }
 
-function loop(now) {
-  requestAnimationFrame(loop);
-  if (!starfieldReady) return;
-  if (systemExplorer.active) return;
-  if (!galaxyScale && centre >= 0 && kind[centre] === 0) lastStarCentre = centre;
-  stepAnimation(now);
-  if (viewFromIndex < 0) controls.update();
+function updateGalaxyScale(preserveView = false) {
   const nextGalaxyScale = camera.position.distanceTo(starPos(milkyWayIndex, _objPos)) >= 40000;
   if (nextGalaxyScale !== galaxyScale) {
     galaxyScale = nextGalaxyScale;
     returnMilkyWayButton.hidden = !galaxyScale;
     updateScaleControls();
     const toggle = document.getElementById('toggle-galaxy');
-    if (toggle.checked !== galaxyScale) {
+    if (!preserveView && toggle.checked !== galaxyScale) {
       toggle.checked = galaxyScale;
       toggle.dispatchEvent(new Event('change'));
     }
-    if (galaxyScale && !animation) {
+    if (!preserveView && galaxyScale && !animation) {
       centre = milkyWayIndex;
       controls.target.copy(starPos(milkyWayIndex));
       camera.lookAt(controls.target);
       afterMove();
     }
-    if (!galaxyScale && lastStarCentre >= 0 && (centre < 0 || kind[centre] !== 0)) {
+    if (!preserveView && !galaxyScale && lastStarCentre >= 0 && (centre < 0 || kind[centre] !== 0)) {
       centre = lastStarCentre;
       const target = starPos(centre);
       controls.target.copy(target);
@@ -3309,6 +3638,16 @@ function loop(now) {
     renderList();
     refreshViewFromResults();
   }
+}
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (!starfieldReady) return;
+  if (systemExplorer.active) return;
+  if (!galaxyScale && centre >= 0 && kind[centre] === 0) lastStarCentre = centre;
+  stepAnimation(now);
+  if (viewFromIndex < 0) controls.update();
+  updateGalaxyScale();
   starMaterial.uniforms.uShowHomeGalaxy.value = galaxyScale && milkyWayToggle.checked ? 1 : 0;
   updateGrid();
   updateLabels();

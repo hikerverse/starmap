@@ -26,11 +26,13 @@
 
   <nav id="top-menu" aria-label="Application menu">
     <button id="toggle-controls" type="button" aria-expanded="false" aria-controls="sidebar">Controls</button>
+    <button id="share-view" type="button" disabled>Share view</button>
     <details id="view-menu">
       <summary>View</summary>
       <div class="menu-commands">
         <button id="open-star-list" aria-pressed="false" aria-controls="star-panel" title="Show or hide the star search and list">Star list</button>
         <button id="open-filters" disabled>Filters...</button>
+        <button id="open-motion" type="button" disabled aria-controls="motion-dialog" aria-expanded="false">Stellar motion...</button>
         <button id="open-subspace" type="button" aria-controls="subspace-dialog" aria-expanded="false">Subspace disturbance...</button>
         <button id="open-shapes" type="button" aria-controls="shape-dialog" aria-expanded="false">Primitive shapes...</button>
         <button id="reset-view" title="Centre on Sol">Reset view</button>
@@ -101,6 +103,32 @@
       </details>
     </form>
   </dialog>
+
+  <dialog id="motion-dialog" aria-labelledby="motion-title">
+    <div class="filter-heading">
+      <h2 id="motion-title">Stellar motion</h2>
+      <button id="close-motion" type="button">Close</button>
+    </div>
+    <label><input id="toggle-motion" type="checkbox"> Enable stellar motion</label>
+    <p id="motion-status" role="status">Measurements download only when enabled.</p>
+    <fieldset id="motion-controls" disabled>
+      <legend>Years from J2000 (2000.0)</legend>
+      <input id="motion-years" type="range" min="-10000" max="10000" step="10" value="0" aria-label="Years from J2000">
+      <label>Year offset <input id="motion-offset" type="number" min="-10000" max="10000" step="1" value="0"></label>
+      <output id="motion-epoch">Epoch 2000.0</output>
+      <button id="motion-reset" type="button">Return to J2000</button>
+      <label><input id="motion-partial" type="checkbox"> Include tangential-only estimates (unknown radial velocity assumed zero)</label>
+    </fieldset>
+    <p>Hollow grey markers lack radial velocity or proper motion;
+      they stay at catalogue positions unless partial estimates are enabled. Grey does not mean stationary.
+      Solid stars have complete velocities. Sol remains the fixed origin.
+      Nebulae, galaxies and compact-object overlays do not move.</p>
+    <p id="motion-warning">Straight-line extrapolation, not a gravitational simulation or an ephemeris.
+      Binary motion and measurement errors limit accuracy. Uncertainty grows away from the reference epoch;
+      select a star for its measurement source and approximate velocity-error budget.</p>
+    <p id="motion-error" role="alert"></p>
+  </dialog>
+  <div id="motion-banner" role="status" hidden></div>
 
   <dialog id="subspace-dialog" aria-labelledby="subspace-title">
     <div class="filter-heading">
@@ -319,15 +347,26 @@
       <tr id="row-mass" hidden><th>Mass</th><td id="d-mass"></td></tr>
       <tr id="row-luminosity" hidden><th>Luminosity</th><td id="d-luminosity"></td></tr>
       <tr id="row-stellar-source" hidden><th>Stellar properties</th><td id="d-stellar-source"></td></tr>
+      <tr id="row-motion" hidden><th>Motion / uncertainty</th><td id="d-motion"></td></tr>
       <tr id="row-notes" hidden><th>Notes</th><td id="d-notes"></td></tr>
       <tr id="row-planets" hidden><th>Planets</th><td><span id="d-planets"></span><br><button id="view-system" title="Show the planetary system">View system</button>
         <button id="explore-system" type="button" hidden>Explore system</button></td></tr>
     </table>
   </div>
 
+  <dialog id="share-dialog" aria-labelledby="share-title">
+    <h2 id="share-title">Share this view</h2>
+    <p id="share-message" role="status"></p>
+    <label for="share-url">Link</label>
+    <textarea id="share-url" rows="4" readonly></textarea>
+    <button id="copy-share-url" type="button">Copy link</button>
+    <button id="close-share" type="button">Close</button>
+  </dialog>
+
   <section id="system-explorer" hidden role="dialog" aria-modal="true" aria-labelledby="system-explorer-title">
     <header>
       <h2 id="system-explorer-title">Explore system</h2>
+      <button id="share-system-view" type="button">Share view</button>
       <button id="close-system-explorer" type="button">Return to star map</button>
     </header>
     <div class="system-space"><div class="system-body-labels"></div></div>
@@ -522,6 +561,9 @@
           <p>The backend selects the active complete dataset. To switch datasets, change the server database setting, restart the backend and reload this page.
             With <em>Colour by &rarr; Planets</em>, stars are coloured by their planet category and <em>Confirmed planets only</em> hides invented systems.</p>
           <p>Select a star with planets and press <b>View system</b> to see its orbits, habitable zone and planet table.</p>
+          <p><b>Share view</b> creates a link to the current camera, selected object and filters.
+            It also supports star viewpoints and system-explorer planet/moon views.
+            Copy a public site link when sharing with other people, not a localhost address.</p>
           <p><b>Explore system</b> opens a 3D view of its star, planets and individually modelled moons.
             Click to select, double-click to centre, or use <b>Centre on selected body</b>.
             Bodies are enlarged by default; choose <b>True physical scale</b> for their stored radii.
@@ -537,6 +579,12 @@
 
         <section id="guide-view-from">
           <h3><span class="guide-icon">&#10022;</span> View from a star</h3>
+          <p><b>View &rarr; Stellar motion...</b> optionally enables measured stellar movement.
+            It downloads velocities only when enabled. Adjust years from J2000 within +/-10,000;
+            solid stars have complete velocities, hollow grey markers are incomplete.
+            Missing radial motion is never invented unless you explicitly enable tangential-only estimates.
+            Select a star for provenance and available errors. The model is straight-line extrapolation,
+            not an exact ephemeris; uncertainty grows with time. Disable it to restore catalogue positions.</p>
           <p>Select a star to open its details panel, then use <b>View from</b> there to place the camera at its catalogue
             position. The panel also lets you search for a different visible observer star. While viewing from a star,
             search for another visible star under <b>Point camera at</b> to aim toward it. Drag to look around and

@@ -262,6 +262,26 @@ body.about-page { height: auto; min-height: 100%; overflow: auto; background: #0
 .class-chip:hover { filter: brightness(1.15); }
 #distance-status:empty { display: none; }
 #subspace-controls { min-width: 0; margin: 4px 0; border: 1px solid #3b4f8f; border-radius: 6px; }
+#motion-dialog {
+  position: fixed; left: 16px; top: 65px; margin: 0; z-index: 35;
+  width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 90px);
+  overflow: auto; box-sizing: border-box; padding: 16px;
+  color: #e5ecff; background: #111a30; border: 1px solid #536ba7; border-radius: 10px;
+}
+#motion-dialog p { font-size: 12px; color: #bac8e6; line-height: 1.5; }
+#motion-dialog label { display: block; margin: 10px 0; }
+#motion-dialog fieldset { min-width: 0; border: 1px solid #536ba7; margin-top: 12px; }
+#motion-years { width: 100%; }
+#motion-offset { width: 100px; }
+#motion-error { color: #ffb6b6 !important; }
+#motion-banner {
+  position: fixed; top: 54px; left: 50%; transform: translateX(-50%);
+  max-width: calc(100vw - 24px); box-sizing: border-box; padding: 7px 12px;
+  background: #243855; color: #f0d99b; border: 1px solid #b69a50; border-radius: 6px;
+  z-index: 5; font-size: 12px; pointer-events: none; text-align: center;
+}
+#d-motion { max-width: 230px; white-space: normal; font-size: 12px; }
+.swatch.motion-incomplete { background: transparent !important; border: 1px solid #87909e; box-sizing: border-box; }
 #subspace-dialog {
   position: fixed; top: 56px; left: 280px; right: auto; margin: 0; z-index: 11;
   box-sizing: border-box; width: min(380px, calc(100vw - 16px)); max-height: calc(100dvh - 72px);
@@ -389,6 +409,12 @@ tr[hidden] { display: none; }
 #d-planets { font-size: 12px; }
 #view-system { padding: 1px 6px; font-size: 11px; margin-top: 3px; }
 #explore-system { margin-top: 4px; }
+#share-dialog {
+  color: #dde6ff; background: #0a1020; border: 1px solid #3b4f8f; border-radius: 6px;
+  width: min(520px, calc(100vw - 48px)); box-sizing: border-box;
+}
+#share-dialog textarea { display: block; width: 100%; box-sizing: border-box; margin: 8px 0; overflow-wrap: anywhere; }
+#share-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
 #explore-system[hidden], #system-explorer[hidden] { display: none; }
 #system-explorer {
   position: fixed; inset: 0; z-index: 40; background: #030611; color: #dde6ff;
