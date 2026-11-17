@@ -284,6 +284,11 @@ The query endpoints use the stored J2000 coordinates, not a browser's optional m
 
 ## Focused frontend tests
 
+Constellation comparisons use a bundled 12-pattern, 81-star HIP/name mapping in
+`static/constellation-model.js`, cross-referenced to the existing HYG catalogue. They require
+no additional database, import command or external service. Missing members in other samples
+are reported rather than guessed. See the [constellation user guide and provenance](USER_GUIDE.md#constellations-from-another-star).
+
 These dependency-free tests require Node.js 22+:
 
 ```powershell
@@ -293,4 +298,5 @@ node --experimental-default-type=module tests\test_filters.mjs
 node --experimental-default-type=module tests\test_system_model.mjs
 node --experimental-default-type=module tests\test_share_view.mjs
 node --experimental-default-type=module tests\test_stellar_motion.mjs
+node --experimental-default-type=module tests\test_constellations.mjs
 ```

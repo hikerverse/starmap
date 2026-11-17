@@ -29,6 +29,9 @@ for (const overrides of [
   { settings: { ...state.settings, planetCategories: [] } },
   { motion: { years: 10001, partial: false } },
   { motion: { years: 10, partial: 'false' } },
+  { constellations: { pattern: 'orion', observer: null, overlay: false } },
+  { constellations: { pattern: '<script>', observer: 'Sol', overlay: true } },
+  { constellations: { pattern: 'orion', observer: 'Sol', overlay: 'true' } },
   { camera: { ...state.camera, position: [0, 0, 0] } },
   { observer: { name: 'Sol', direction: [0, 0, 0], magnitude: 6, fov: 55 } },
   { system: { name: 'Sol', body: 'Earth', focus: 'Earth', scale: 'bad',
@@ -39,6 +42,7 @@ for (const overrides of [
 assert.throws(() => sharedViewFromHash('#view=%7Bbad'));
 assert.throws(() => sharedViewFromHash('#view=' + 'x'.repeat(100001)));
 for (const extra of [
+  { constellations: { pattern: 'orion', observer: 'Proxima Centauri', overlay: true } },
   { motion: { years: -5000, partial: true } },
   { observer: { name: 'Sol', direction: [0, 0, -1], magnitude: 6.5, fov: 40 } },
   { system: { name: 'Sol', body: 'Moon', focus: 'Moon', scale: 'true',

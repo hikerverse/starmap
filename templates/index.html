@@ -33,6 +33,7 @@
         <button id="open-star-list" aria-pressed="false" aria-controls="star-panel" title="Show or hide the star search and list">Star list</button>
         <button id="open-filters" disabled>Filters...</button>
         <button id="open-motion" type="button" disabled aria-controls="motion-dialog" aria-expanded="false">Stellar motion...</button>
+        <button id="open-constellations" type="button" disabled aria-controls="constellation-dialog" aria-expanded="false">Constellations from another star...</button>
         <button id="open-subspace" type="button" aria-controls="subspace-dialog" aria-expanded="false">Subspace disturbance...</button>
         <button id="open-shapes" type="button" aria-controls="shape-dialog" aria-expanded="false">Primitive shapes...</button>
         <button id="reset-view" title="Centre on Sol">Reset view</button>
@@ -102,6 +103,37 @@
         <p id="filter-text-status" role="status" aria-live="polite"></p>
       </details>
     </form>
+  </dialog>
+
+  <dialog id="constellation-dialog" aria-labelledby="constellation-title">
+    <div class="filter-heading">
+      <h2 id="constellation-title">Constellations from another star</h2>
+      <button id="close-constellations" type="button">Close</button>
+    </div>
+    <label for="constellation-pattern">Familiar pattern</label>
+    <select id="constellation-pattern"></select>
+    <p>Observer: <strong id="constellation-observer"></strong>. An active <b>View from</b> viewpoint takes precedence.</p>
+    <div class="constellation-actions">
+      <button id="constellation-use-selected" type="button">Compare selected star</button>
+      <button id="constellation-view-from" type="button">View from this star</button>
+      <button id="constellation-look" type="button">Look at pattern</button>
+    </div>
+    <label><input id="constellation-overlay" type="checkbox"> Draw pattern in the observer's sky</label>
+    <div class="constellation-charts">
+      <figure><figcaption>Sol / Earth proxy</figcaption><svg id="constellation-earth-chart" viewBox="-115 -115 230 230" role="img"></svg></figure>
+      <figure><figcaption id="constellation-observer-caption">Selected observer</figcaption><svg id="constellation-observer-chart" viewBox="-115 -115 230 230" role="img"></svg></figure>
+    </div>
+    <p id="constellation-scale"></p>
+    <p id="constellation-status" role="status"></p>
+    <details><summary>Pattern stars and availability</summary><ol id="constellation-members"></ol></details>
+    <p>Charts include all available pattern members, even those too faint or filtered out in the sky.
+      Sky lines connect visible members only; increase the limiting magnitude to reveal faint members.
+      These 12 illustrative stick figures include asterisms, not official IAU boundaries or physically connected stars.</p>
+    <p>Uses catalogue 3D distances, not a flat warp of an Earth chart. Sol approximates Earth's location;
+      annual parallax, extinction and light-travel-time effects are not modelled. Stellar motion, if enabled,
+      applies to both charts at the selected epoch. Missing members are never invented.
+      Star identifiers: HYG v4.0, CC BY-SA 4.0; independently drawn connecting lines.</p>
+    <p id="constellation-error" role="alert"></p>
   </dialog>
 
   <dialog id="motion-dialog" aria-labelledby="motion-title">
@@ -579,6 +611,14 @@
 
         <section id="guide-view-from">
           <h3><span class="guide-icon">&#10022;</span> View from a star</h3>
+          <p><b>View &rarr; Constellations from another star...</b> compares 12 familiar stick figures
+            from Sol and a chosen observer at the same angular scale. Select a star and press
+            <b>Compare from</b>, or use the active stellar viewpoint. <b>View from this star</b>
+            enters its sky; <b>Look at pattern</b> aims toward visible members. Amber sky lines
+            respect magnitude limits and filters; diagrams show all loaded members. Missing
+            members and the observer itself are omitted where a sky direction is unavailable.
+            These are illustrative asterisms, not official boundaries. Closing the panel leaves
+            the optional overlay enabled; uncheck it there to switch it off.</p>
           <p><b>View &rarr; Stellar motion...</b> optionally enables measured stellar movement.
             It downloads velocities only when enabled. Adjust years from J2000 within +/-10,000;
             solid stars have complete velocities, hollow grey markers are incomplete.

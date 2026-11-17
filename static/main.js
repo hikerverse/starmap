@@ -10,6 +10,7 @@ import { createShapeEditor } from './shape-editor.js';
 import { createSystemExplorer } from './system-explorer.js';
 import { sharedViewFromHash, sharedViewUrl } from './share-view.js';
 import { validateMotion, applyMotionPositions, motionDescription, MOTION_LIMIT_YEARS } from './stellar-motion.js';
+import { createConstellations } from './constellations.js';
 
 // ---------- Tunables ----------
 const PICK_RADIUS_PX = 12;      // how close (in pixels) a click must be to a star
@@ -319,6 +320,27 @@ let observerAttr;
 let viewDrag = null;
 
 const starPos = (i, target = new THREE.Vector3()) => target.set(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]);
+const constellations = createConstellations({
+  scene,
+  getState: () => ({ viewFrom: viewFromIndex, selected, sol: solIndex, starCount: firstSpecial,
+    frame, galaxyScale, epoch: `${motionEnabled}:${motionYears}:${motionPartial.checked}`,
+    toDisplay: direction => {
+      const vector = new THREE.Vector3(...direction);
+      if (frame === 'galactic') vector.applyMatrix3(EQ_TO_GAL);
+      return vector.toArray();
+    } }),
+  getPosition: i => [records[i].x, records[i].y, records[i].z],
+  isVisible: i => !isHidden(i),
+  viewFrom: i => setViewFromStar(i),
+  aim: direction => {
+    const vector = new THREE.Vector3(...direction);
+    if (frame === 'galactic') vector.applyMatrix3(EQ_TO_GAL);
+    controls.target.copy(camera.position).add(vector);
+    camera.lookAt(controls.target);
+    document.getElementById('view-from-direction').textContent = 'Looking toward the constellation pattern.';
+    labelsDirty = true;
+  },
+});
 const shapeEditor = createShapeEditor({
   scene, camera, labelLayer, eqToGal: EQ_TO_GAL, galToEq: GAL_TO_EQ,
   getObjects: () => records, getSelected: () => selected >= 0 ? records[selected] : null,
@@ -2292,6 +2314,8 @@ window.addEventListener('keydown', (e) => {
   if (filterDialog.open) { filterDialog.close(); return; }
   if (subspaceDialog.open) { e.preventDefault(); subspaceDialog.close(); return; }
   if (motionDialog.open) { e.preventDefault(); motionDialog.close(); return; }
+  const constellationDialog = document.getElementById('constellation-dialog');
+  if (constellationDialog.open) { e.preventDefault(); constellationDialog.close(); return; }
   if (shapeDialog.open) { e.preventDefault(); shapeDialog.close(); return; }
   const openMenu = topMenus.find((menu) => menu.open);
   if (openMenu) { openMenu.open = false; return; }
@@ -2472,6 +2496,7 @@ async function init() {
   }
   document.getElementById('share-view').disabled = false;
   motionOpen.disabled = false;
+  constellations.initialize(records, firstSpecial);
   if (sharedView) {
     await loadDataset();
     await restoreSharedLocation();
@@ -2757,6 +2782,8 @@ function shareCurrentView() {
     if (systemExplorer.active) {
       view.system = { ...systemExplorer.snapshot(), dataset: activeDataset.id };
     }
+    const constellationState = constellations.snapshot();
+    if (constellationState) view.constellations = constellationState;
     const url = sharedViewUrl(window.location.href, view);
     showShareMessage('Copy this link to reopen the view. Anyone with the link can read its location and filter settings.', url);
     document.getElementById('share-url').select();
@@ -2827,6 +2854,7 @@ async function restoreSharedLocation() {
       selectStar(index);
       await exploreSystem(index, system);
     }
+    if (sharedView.constellations) constellations.restore(sharedView.constellations);
   } catch (err) {
     console.error('Could not restore shared location:', err);
     showShareMessage(`Shared view could not be fully opened: ${err.message}`);
@@ -3652,6 +3680,7 @@ function loop(now) {
   updateGrid();
   updateLabels();
   shapeEditor.updateLabels();
+  constellations.update(camera);
   updateCameraInfo();
   updateOrientation();
   if (frame === 'galactic') displayToGalactic.identity();

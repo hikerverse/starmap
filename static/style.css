@@ -262,6 +262,26 @@ body.about-page { height: auto; min-height: 100%; overflow: auto; background: #0
 .class-chip:hover { filter: brightness(1.15); }
 #distance-status:empty { display: none; }
 #subspace-controls { min-width: 0; margin: 4px 0; border: 1px solid #3b4f8f; border-radius: 6px; }
+#constellation-dialog {
+  position: fixed; top: 56px; left: 16px; margin: 0; z-index: 36;
+  width: min(570px, calc(100vw - 32px)); max-height: calc(100dvh - 76px);
+  overflow: auto; box-sizing: border-box; padding: 14px; color: #dde6ff;
+  background: #0a1020; border: 1px solid #536ba7; border-radius: 8px; font-size: 13px;
+}
+#constellation-title { flex: 1; margin: 0; font-size: 17px; }
+#constellation-dialog p { line-height: 1.5; font-size: 12px; color: #bac8e6; }
+#constellation-dialog label { display: block; margin: 10px 0; }
+#constellation-pattern { width: 100%; padding: 6px; color: #dde6ff; background: #101a30; border: 1px solid #536ba7; font: inherit; }
+.constellation-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.constellation-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.constellation-charts figure { margin: 6px 0; min-width: 0; }
+.constellation-charts figcaption { text-align: center; font-size: 12px; }
+.constellation-charts svg { display: block; width: 100%; height: auto; }
+#constellation-earth-chart { color: #8fbfff; }
+#constellation-observer-chart { color: #ffc867; }
+#constellation-members { padding-left: 26px; font-size: 12px; line-height: 1.6; }
+#constellation-error { color: #ffb6b6 !important; }
+#constellation-error:empty { display: none; }
 #motion-dialog {
   position: fixed; left: 16px; top: 65px; margin: 0; z-index: 35;
   width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 90px);

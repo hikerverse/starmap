@@ -17,6 +17,7 @@ For installation, deployment and data-maintenance commands, see the [README](REA
 - [Controls and navigation](#controls)
 - [Sharing a location or viewpoint](#sharing-a-location-or-viewpoint)
 - [Stellar motion time slider](#stellar-motion-time-slider)
+- [Constellations from another star](#constellations-from-another-star)
 - [Star data and Gaia techniques](#star-database)
 - [Neutron stars](#neutron-star-database), [black holes](#black-hole-database) and [nebulae](#nebulae)
 - [Galaxies and cross-matching](#extragalactic-objects)
@@ -170,6 +171,67 @@ centre; type in its search box to find stars by name. Click an entry to select i
 it. Drag the panel by its title; close it with **×**, the menu item again, or Escape (the first Escape
 clears a search). The list is only recomputed while the panel is open.
 
+### Constellations from another star
+
+Open **View → Constellations from another star...**. Choose one of 12 familiar patterns:
+Orion, the Big Dipper, Cassiopeia's W, the Northern Cross, the Southern Cross, Scorpius,
+Leo, the Great Square of Pegasus, the Hyades V, the Little Dipper, Gemini or Lyra.
+These are simplified, independently drawn stick figures, including asterisms; they are
+not the 88 official IAU constellation boundaries, and do not imply physical connections.
+
+The left chart shows the pattern from **Sol (Earth proxy)**. Select a star in the map,
+then click **Compare from [star]** in the constellation panel for the right chart.
+If you are already in **View from**, that active observer takes precedence. Entering a
+different stellar viewpoint updates the comparison automatically.
+
+Both charts use **the same angular scale**, with each pattern independently centred,
+celestial north up and east left. Numbers identify the same stars in both charts;
+expand **Pattern stars and availability** for names and Hipparcos identifiers.
+The centre-to-rim scale and largest separation of common members are shown in degrees.
+The RMS pairwise angular change quantifies changes in separations between the same
+available stars, independently of chart orientation. It is not a measurement-error estimate.
+Azimuthal equidistant projection preserves angular distance from each chart centre, not
+all pairwise separations; very widely scattered patterns distort toward the rim.
+
+**View from this star** enters the chosen observer's sky and enables the amber line overlay.
+**Look at pattern** points toward its visible members. Drag the sky to explore the rest.
+**Draw pattern in the observer's sky** switches the overlay on/off; closing the panel does
+not disable it. Leaving the stellar viewpoint hides the sky lines without changing the map.
+The diagram comparison remains usable outside a viewpoint.
+
+Charts include all available pattern members, **even if too faint or filtered out in the
+sky**; they illustrate shape, not naked-eye visibility. The sky overlay, however, only
+connects members passing the existing magnitude limit, star toggles and filters. Increase
+the limiting magnitude or relax filters if necessary. Missing catalogue members and their
+incident lines are omitted, not substituted with nearby stars. An observer which is itself
+a pattern member has no direction in its own sky, so that point and its incident lines are
+omitted there. Exactly antipodal directions have no unique projected azimuth or connecting
+shortest arc; undefined projections/arcs are omitted.
+
+**Data and method:** the 81 pattern-member identities were cross-referenced by Hipparcos
+ID and unique rounded J2000 coordinates against the existing HYG-enriched catalogue.
+The bundled mapping retains each HIP ID and exact map name; runtime matching uses that
+exact name, so renamed or absent members are explicitly reported rather than guessed.
+All 81 are available in the prepared HYG/Both 1 kpc sample; a Gaia-only or custom sample
+may omit members. HYG v4.0 is by David Nash and contributors,
+[CC BY-SA 4.0](https://github.com/astronexus/HYG-Database); the identities in this mapping
+retain that attribution. Connecting-line choices are illustrative, not copied sky-culture
+artwork. Alpheratz, for example, participates in the Great Square asterism although it is
+in Andromeda.
+
+For each available star, the app normalizes **star position minus observer position** to
+derive a sky direction from the actual catalogue 3D geometry. Sky lines follow shortest
+great-circle arcs between these directions; stars are never moved to an artificial flat
+constellation plane. Changing Galactic/Equatorial display frame preserves the result.
+The stellar-motion slider, when active, updates both skies at the chosen epoch.
+Sol approximates Earth's location: annual parallax, light-travel-time effects, extinction
+and uncertainties in the underlying distances are not simulated. Use this as an educational
+comparison, not an observation-grade sky prediction.
+
+**Share view** includes the selected pattern, comparison observer and overlay option.
+Opening the link reopens the comparison. Ordinary visits leave this feature off; it adds
+no new star-catalogue download or external network dependency.
+
 ### Stellar motion time slider
 
 Open **View → Stellar motion...**, then check **Enable stellar motion**. This optional mode
@@ -290,6 +352,7 @@ Links restore:
   limit, advanced filter expression and colour mode.
 - An active **View from** observer, looking direction and limiting magnitude.
 - An enabled stellar-motion time offset and the tangential-only-estimates option.
+- An open/enabled constellation comparison's pattern, observer and sky-line option.
 - An active **Explore system** host, selected/focused star/planet/moon, camera and body-size
   mode. System links require the same active planetary dataset on the server.
 

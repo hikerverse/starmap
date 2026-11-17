@@ -31,6 +31,13 @@ export function validateSharedView(value) {
     camera: { position: [...c.position], target: [...c.target], centre: c.centre, fov: c.fov },
     selected: value.selected, lastStarCentre: value.lastStarCentre,
   };
+  if (value.constellations !== undefined) {
+    const c = value.constellations;
+    if (!c || typeof c.pattern !== 'string' || !/^[a-z-]{1,40}$/.test(c.pattern)
+      || typeof c.observer !== 'string' || !c.observer.length || !name(c.observer)
+      || typeof c.overlay !== 'boolean') invalid();
+    result.constellations = { pattern: c.pattern, observer: c.observer, overlay: c.overlay };
+  }
   if (value.motion !== undefined) {
     const m = value.motion;
     if (!m || !Number.isFinite(m.years) || Math.abs(m.years) > 10000
