@@ -2355,9 +2355,8 @@ async function init() {
   const prefs = sharedView ? sharedView.settings : loadPrefs();
   const savedRadius = Number(prefs.loadRadiusPc);
   const loadRadiusPc = [1000, 2000, 5000].includes(savedRadius) ? savedRadius : 1000;
-  const phoneLayout = window.matchMedia('(max-width: 600px), (max-height: 600px) and (pointer: coarse)').matches;
   const loadSource = ['both', 'hyg', 'gaia'].includes(prefs.loadSource)
-    ? prefs.loadSource : phoneLayout ? 'hyg' : 'both';
+    ? prefs.loadSource : 'hyg';
   document.getElementById('load-distance').value = String(loadRadiusPc);
   loadSourceSelect.value = loadSource;
   loadedRadiusPc = loadRadiusPc;
