@@ -50,7 +50,7 @@ const NEB_SNR = 3;
 const NEB_DARK = 4;
 const NEB_MORPHOLOGIES = { round: 0, elliptical: 1, bipolar: 2, irregular: 3, asymmetric: 3, 'quasi-stellar': 0 };
 // Label priority of nebulae, as an equivalent absolute magnitude (curated famous nebulae first)
-const NEB_LABEL_MAG = { curated: -7, 'Zucker+ 2020': -5 };
+const NEB_LABEL_MAG = { curated: -7, 'Zucker+ 2020': -5, 'Konietzka+ 2024': -7 };
 const NEB_LABEL_MAG_DEFAULT = 1;
 const NEB_SUBPUFFS = 3;         // extra noise puffs around single-puff nebulae for a less regular shape
 const NEB_SNR_WISPS = 6;        // loose filament wisps scattered around each supernova remnant
@@ -375,6 +375,7 @@ let confirmedOnly = false;
 let advancedFilter = emptyFilter();
 let filterGalaxies = false;
 let advancedMask = null, advancedMaskAttr = null;
+const specialObjects = [{ name: 'Radcliffe Wave', kind: KIND_NEBULA, index: -1, visible: true }];
 let filterBuilder = null;
 // Saved settings that need planetary data wait here until the active dataset loads
 let pendingFilterText = null;
@@ -384,9 +385,16 @@ function filterData() {
   return { records, kind, specClass, sovOf, sovereignties, planetCat, planetFlags };
 }
 
-function refreshAdvancedMask() {
-  advancedMask.set(evaluateFilter(advancedFilter, filterData(), filterGalaxies));
+function setAdvancedMask(mask) {
+  advancedMask.set(mask);
+  for (const object of specialObjects) {
+    if (object.index >= 0 && !object.visible) advancedMask[object.index] = 0;
+  }
   advancedMaskAttr.needsUpdate = true;
+}
+
+function refreshAdvancedMask() {
+  setAdvancedMask(evaluateFilter(advancedFilter, filterData(), filterGalaxies));
 }
 
 function applyAdvancedFilter(tree, includeGalaxies) {
@@ -394,8 +402,7 @@ function applyAdvancedFilter(tree, includeGalaxies) {
   advancedFilter = structuredClone(tree);
   filterGalaxies = includeGalaxies;
   pendingFilterText = null;
-  advancedMask.set(mask);
-  advancedMaskAttr.needsUpdate = true;
+  setAdvancedMask(mask);
   visibilityChanged();
 }
 
@@ -2197,6 +2204,109 @@ function visibilityChanged() {
   refreshViewFromResults();
   persist();
 }
+
+const specialDialog = document.getElementById('special-objects-dialog');
+const specialTitle = document.getElementById('special-objects-title');
+const specialOpen = document.getElementById('open-special-objects');
+const specialStatus = document.getElementById('special-objects-status');
+let specialDrag = null;
+
+function positionSpecialDialog(left, top) {
+  const rect = specialDialog.getBoundingClientRect();
+  specialDialog.style.left = `${Math.max(0, Math.min(left, window.innerWidth - rect.width))}px`;
+  specialDialog.style.top = `${Math.max(0, Math.min(top, window.innerHeight - rect.height))}px`;
+}
+
+specialOpen.addEventListener('click', () => {
+  document.getElementById('view-menu').open = false;
+  if (!specialDialog.open) specialDialog.show();
+  specialOpen.setAttribute('aria-expanded', 'true');
+  const rect = specialDialog.getBoundingClientRect();
+  positionSpecialDialog(rect.left, rect.top);
+  specialDialog.querySelector('input:not(:disabled), button:not(#close-special-objects):not(:disabled)')?.focus();
+});
+document.getElementById('close-special-objects').addEventListener('click', () => specialDialog.close());
+specialDialog.addEventListener('close', () => {
+  specialOpen.setAttribute('aria-expanded', 'false');
+  document.querySelector('#view-menu summary').focus();
+});
+specialTitle.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 || !event.isPrimary || specialDrag) return;
+  const rect = specialDialog.getBoundingClientRect();
+  specialDrag = { id: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
+  specialTitle.setPointerCapture(event.pointerId);
+  specialTitle.classList.add('dragging');
+  event.preventDefault();
+});
+specialTitle.addEventListener('pointermove', (event) => {
+  if (specialDrag?.id === event.pointerId) positionSpecialDialog(event.clientX - specialDrag.x, event.clientY - specialDrag.y);
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  specialTitle.addEventListener(type, () => {
+    if (!specialDrag) return;
+    const { id } = specialDrag;
+    specialDrag = null;
+    specialTitle.classList.remove('dragging');
+    if (specialTitle.hasPointerCapture(id)) specialTitle.releasePointerCapture(id);
+  });
+}
+window.addEventListener('resize', () => {
+  if (!specialDialog.open) return;
+  const rect = specialDialog.getBoundingClientRect();
+  positionSpecialDialog(rect.left, rect.top);
+});
+
+function buildSpecialObjects() {
+  const rows = specialObjects.map((object) => {
+    const row = document.createElement('div');
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = object.visible;
+    checkbox.disabled = object.index < 0;
+    label.append(checkbox, document.createTextNode(` ${object.name}${object.index < 0 ? ' (unavailable)' : ''}`));
+    checkbox.addEventListener('change', () => {
+      object.visible = checkbox.checked;
+      refreshAdvancedMask();
+      visibilityChanged();
+      specialStatus.textContent = '';
+    });
+    const explore = document.createElement('button');
+    explore.type = 'button';
+    explore.textContent = 'Explore';
+    explore.setAttribute('aria-label', `Explore ${object.name}`);
+    explore.disabled = object.index < 0;
+    explore.addEventListener('click', () => {
+      if (!object.visible) {
+        checkbox.checked = true;
+        checkbox.dispatchEvent(new Event('change'));
+      }
+      const i = object.index;
+      if (!kindVisible[kind[i]] || !nebTypeVisible[specClass[i]] || !advancedMask[i]
+        || sovState[i] === SOV_HIDDEN || outsideFilter(i)) {
+        specialStatus.textContent = `${object.name} is hidden by a display or object filter. Adjust the filters to explore it.`;
+        return;
+      }
+      specialStatus.textContent = '';
+      exitViewFrom();
+      const offset = camera.position.clone().sub(controls.target);
+      if (offset.lengthSq() === 0) offset.set(0, 0, 1).applyQuaternion(camera.quaternion);
+      const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+      const limitingHalfFov = Math.atan(Math.tan(halfFov) * Math.min(1, camera.aspect));
+      offset.setLength(Math.max(FOCUS_DISTANCE_PC, records[i].radius_pc / Math.sin(limitingHalfFov) * 1.1));
+      const target = starPos(i);
+      if (galaxyScale) centre = solIndex;
+      animateTo(target, target.clone().add(offset), () => {
+        centre = i;
+        if (!isHidden(i)) selectStar(i);
+        afterMove();
+      });
+    });
+    row.append(label, explore);
+    return row;
+  });
+  document.getElementById('special-objects-list').replaceChildren(...rows);
+}
 document.getElementById('colour-mode').addEventListener('change', (e) => {
   colourMode = e.target.value;
   pendingColourMode = null;
@@ -2312,6 +2422,8 @@ window.addEventListener('keydown', (e) => {
   if (guideDialog.open && guideDialog.contains(document.activeElement)) { e.preventDefault(); guideDialog.close(); return; }
   const filterDialog = document.getElementById('filter-dialog');
   if (filterDialog.open) { filterDialog.close(); return; }
+  const specialDialog = document.getElementById('special-objects-dialog');
+  if (specialDialog.open) { e.preventDefault(); specialDialog.close(); return; }
   if (subspaceDialog.open) { e.preventDefault(); subspaceDialog.close(); return; }
   if (motionDialog.open) { e.preventDefault(); motionDialog.close(); return; }
   const constellationDialog = document.getElementById('constellation-dialog');
@@ -2450,6 +2562,10 @@ async function init() {
       await yieldLoading();
     }
   }
+  for (const object of specialObjects) {
+    object.index = records.findIndex((record, i) => kind[i] === object.kind && record.name === object.name);
+  }
+  buildSpecialObjects();
   updateLoading('Processing stars...', `${N.toLocaleString()} of ${N.toLocaleString()} catalogue objects`, N, N);
   await yieldLoading();
   updateLoading('Loading catalogue groups...', 'Applying sovereignty data.');
@@ -2888,6 +3004,7 @@ function savedState() {
     nebulaTypes: [...nebTypeVisible],
     planetCategories: [...planetVisible],
     hiddenSovereignties: sovereignties.filter((_, k) => !sovVisible[k]).map((s) => s.name),
+    hiddenSpecialObjects: specialObjects.filter((object) => !object.visible).map((object) => object.name),
     distance: document.getElementById('distance-filter').value,
     loadRadiusPc: Number(document.getElementById('load-distance').value),
     loadSource: loadSourceSelect.value,
@@ -2953,6 +3070,12 @@ function restorePrefs(prefs) {
     }
     if (isBoolArray(prefs.spectralClasses, classVisible.length)) setClassVisibility(prefs.spectralClasses);
     if (isBoolArray(prefs.nebulaTypes, nebTypeVisible.length)) setNebTypeVisibility(prefs.nebulaTypes);
+    if (Array.isArray(prefs.hiddenSpecialObjects)) {
+      const hidden = new Set(prefs.hiddenSpecialObjects);
+      for (const object of specialObjects) object.visible = !hidden.has(object.name);
+      refreshAdvancedMask();
+      buildSpecialObjects();
+    }
     if (isBoolArray(prefs.planetCategories, planetVisible.length)) planetVisible.splice(0, Infinity, ...prefs.planetCategories);
     if (Array.isArray(prefs.hiddenSovereignties)) {
       const hidden = new Set(prefs.hiddenSovereignties);

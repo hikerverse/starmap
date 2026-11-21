@@ -31,6 +31,7 @@
       <summary>View</summary>
       <div class="menu-commands">
         <button id="open-star-list" aria-pressed="false" aria-controls="star-panel" title="Show or hide the star search and list">Star list</button>
+        <button id="open-special-objects" type="button" aria-controls="special-objects-dialog" aria-expanded="false">Special objects...</button>
         <button id="open-filters" disabled>Filters...</button>
         <button id="open-motion" type="button" disabled aria-controls="motion-dialog" aria-expanded="false">Stellar motion...</button>
         <button id="open-constellations" type="button" disabled aria-controls="constellation-dialog" aria-expanded="false">Constellations from another star...</button>
@@ -161,6 +162,16 @@
     <p id="motion-error" role="alert"></p>
   </dialog>
   <div id="motion-banner" role="status" hidden></div>
+
+  <dialog id="special-objects-dialog" aria-labelledby="special-objects-title">
+    <div class="filter-heading">
+      <h2 id="special-objects-title" title="Drag to move this panel">Special objects</h2>
+      <button id="close-special-objects" type="button">Close</button>
+    </div>
+    <p>Show or hide individual objects, or explore them in the map. Other display filters still apply.</p>
+    <div id="special-objects-list"></div>
+    <p id="special-objects-status" role="status" aria-live="polite"></p>
+  </dialog>
 
   <dialog id="subspace-dialog" aria-labelledby="subspace-title">
     <div class="filter-heading">
@@ -569,6 +580,8 @@
           <p>Open <em>View &rarr; Star list</em> for a floating panel listing the stars nearest the centre. Type in the search box to
             find a star by name; click a result to select it, double-click to fly to it.</p>
           <p>Drag the panel by its title to move it. <kbd>Esc</kbd> clears the search first, then closes the panel.</p>
+          <p>Open <em>View &rarr; Special objects&hellip;</em> to show or hide the Radcliffe Wave individually,
+            or use <b>Explore</b> to fly to it. Nebula and other display filters still apply.</p>
         </section>
 
         <section id="guide-filters">

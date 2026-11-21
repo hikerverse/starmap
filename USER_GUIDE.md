@@ -59,7 +59,7 @@ the browser can rotate them into galactic coordinates without changing the under
 | [HYG v4.0](https://github.com/astronexus/HYG-Database) | [Star catalogue](#star-database), labels, stellar colours and observer views | Imported into the active SQLite dataset; names and original positions are preserved during Gaia enrichment. Magnitude-limited and incomplete, especially for distant faint stars. CC BY-SA 4.0. |
 | [Gaia DR3](https://www.cosmos.esa.int/web/gaia/dr3) | [HYG enrichment](#enriching-the-star-database-with-gaia-dr3), [additional stars](#adding-gaia-dr3-stars), [estimated spectral classes](#estimating-gaia-spectral-classes) | Identifier/position cross-matching, quality and brightness cuts, inverse-parallax distances, epoch propagation to J2000 and temperature-based classification. This is a selected sample, not all Gaia stars. |
 | SIMBAD / ATNF and published compact-object measurements | [Neutron stars](#neutron-star-database) and [black holes](#black-hole-database) | Curated positions, distances and available masses; uncertainties and disputed cases are documented below. |
-| Curated nebulae; González-Santamaría et al. (2021); Zucker et al. (2020) | [Nebula overlays](#nebulae) | Literature/Gaia distances, angular sizes, planetary morphology and molecular-cloud sightlines; glows are procedural, not observed images or reconstructed gas volumes. |
+| Curated nebulae; González-Santamaría et al. (2021); Zucker et al. (2020); Konietzka et al. (2024) | [Nebula overlays](#nebulae) | Literature/Gaia distances, angular sizes, planetary morphology, molecular-cloud sightlines and the published Radcliffe Wave best-fit centerline; glows are procedural, not observed images or reconstructed gas volumes. |
 | [Reid et al. (2019)](https://arxiv.org/html/1910.03357v1#A2.T2) | Milky Way spiral-arm backdrop | Parallax-based arm fits anchor illustrative broadened/extended arms. Decorative stars, gas, dust and the home-galaxy symbol do not add observed catalogue objects. |
 | Curated NED/SIMBAD/literature galaxies | [Extragalactic objects](#extragalactic-objects): 52 galaxies, groups and clusters | Per-object published distances take precedence when matching additional survey detections. |
 | [OpenNGC](https://github.com/mattiaverga/OpenNGC) | [Extragalactic expansion](#extragalactic-objects): 9,087 additions | NGC/IC objects with known redshifts in the selected range, deduplicated against curated entries; approximate heliocentric Hubble-flow distances. Adapted records retain CC BY-SA 4.0. |
@@ -169,6 +169,12 @@ Open **View → Star list** to show a floating, draggable panel listing the 25 s
 centre; type in its search box to find stars by name. Click an entry to select it, double-click to fly to
 it. Drag the panel by its title; close it with **×**, the menu item again, or Escape (the first Escape
 clears a search). The list is only recomputed while the panel is open.
+
+Open **View → Special objects...** for a draggable window with the Radcliffe Wave.
+Use its checkbox to show or hide it individually; **Explore** turns it on and flies
+to a view sized to fit the structure. Nebula visibility, type and other object filters
+still apply, and a message appears if they prevent exploration. Its individual visibility
+is saved in this browser and included in shared views.
 
 ### Constellations from another star
 
@@ -347,7 +353,7 @@ Links restore:
   catalogue defaults for that visit.
 - Coordinate frame, map camera position/target/field of view, rotation centre, selected
   catalogue object and the last star centre used before galaxy-scale zoom.
-- Display toggles, spectral/nebula/planet-category filters, hidden sovereignties, distance
+- Display toggles, spectral/nebula/planet-category filters, hidden sovereignties and special objects, distance
   limit, advanced filter expression and colour mode.
 - An active **View from** observer, looking direction and limiting magnitude.
 - An enabled stellar-motion time offset and the tangential-only-estimates option.
@@ -693,13 +699,14 @@ Unicorn") are deliberately left out.
 ## Nebulae
 
 Nebulae live in [data/nebulae.json](data/nebulae.json) (under a `nebulae` key) and are served at
-`/api/nebulae`. The file holds 454 objects from three sources:
+`/api/nebulae`. The file holds 455 objects:
 
 | Source | Count | Contents |
 | --- | --- | --- |
 | [data/nebulae_curated.csv](data/nebulae_curated.csv) | 88 | Famous emission, reflection, planetary, supernova-remnant and dark nebulae (M42, Helix, Veil, Gum, Coalsack…) with literature distances and angular sizes |
 | González-Santamaría et al. 2021, [A&A 656, A51](https://doi.org/10.1051/0004-6361/202141916) | 272 | Planetary nebulae with Gaia EDR3 parallaxes (S/N ≥ 3, within 3 kpc), with physical radius and morphology |
 | Zucker et al. 2020, [A&A 633, A51](https://doi.org/10.1051/0004-6361/201936145) | 94 | Local molecular clouds with Gaia DR2 distances, drawn as dark clouds with one puff per measured sightline |
+| [Bundled Konietzka et al. 2024 model](data/radcliffe_wave_best_fit_model_Konietzka2024.tab), [Harvard Dataverse](https://doi.org/10.7910/DVN/F98QHY) (CC0 1.0) | 1 | Radcliffe Wave 3D best-fit centerline, sampled from 1,500 heliocentric Galactic-coordinate model points and converted to equatorial J2000 |
 
 Each entry uses the star fields (`name`, `x`, `y`, `z`, `colour`, `spectral_class` holding the type label), plus:
 
@@ -712,13 +719,15 @@ Each entry uses the star fields (`name`, `x`, `y`, `z`, `colour`, `spectral_clas
 | `ids`, `constellation`, `notes` | string | Optional |
 | `distance_ref`, `distance_range_pc` | string, array | Where the distance came from and its range, if known |
 | `source` | string | Which source the entry came from |
-| `puffs` | array | Molecular clouds only: `[x, y, z, radius]` per sightline (pc, equatorial) |
+| `puffs` | array | Molecular clouds: `[x, y, z, radius]` per sightline (pc, equatorial); Radcliffe Wave samples the published best-fit centerline every 20 pc |
 
 Curated planetary nebulae take the Gaia distance when a catalogue match within 1′ has a good parallax.
 Curated radii are `distance × tan(angular size / 2)`.
 
 Caveats: curated coordinates, distances and sizes are rounded literature values, good to roughly 5–20%.
-Nebulae use camera-facing procedural billboards, not reconstructed 3D gas volumes. Planetary shapes
+The Radcliffe Wave path follows the published best-fit model, but its displayed puff radius is illustrative:
+the source provides a centerline, not a reconstructed continuous gas volume. Nebulae use camera-facing procedural billboards,
+not reconstructed 3D gas volumes. Planetary shapes
 follow catalogue morphology where available, but their orientation and small-scale detail are
 illustrative, not measured images. A molecular cloud's
 size reflects the spread of its sightline distances, so large complexes (Cygnus X, Cepheus) can look

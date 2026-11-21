@@ -17,6 +17,8 @@ const state = {
 const cleaned = validateSharedView(state);
 assert.equal(cleaned.settings.shapes, undefined);
 assert.equal(cleaned.settings.guide, undefined);
+assert.deepEqual(validateSharedView({ ...state, settings: { ...state.settings,
+  hiddenSpecialObjects: ['Radcliffe Wave'] } }).settings.hiddenSpecialObjects, ['Radcliffe Wave']);
 const url = sharedViewUrl('https://example.test/map?test=1#old', state);
 assert.equal(new URL(url).search, '?test=1');
 assert.deepEqual(sharedViewFromHash(new URL(url).hash), cleaned);
@@ -27,6 +29,7 @@ for (const overrides of [
   { settings: { ...state.settings, loadRadiusPc: 999999 } },
   { settings: { ...state.settings, spectralClasses: [true] } },
   { settings: { ...state.settings, planetCategories: [] } },
+  { settings: { ...state.settings, hiddenSpecialObjects: [false] } },
   { motion: { years: 10001, partial: false } },
   { motion: { years: 10, partial: 'false' } },
   { constellations: { pattern: 'orion', observer: null, overlay: false } },

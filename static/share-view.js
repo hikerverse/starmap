@@ -26,6 +26,11 @@ export function validateSharedView(value) {
   const settings = Object.fromEntries(['frame', 'colourMode', 'loadSource', 'loadRadiusPc',
     'filter', 'distance', 'toggles', 'spectralClasses', 'nebulaTypes', 'planetCategories',
     'hiddenSovereignties'].map(key => [key, s[key]]));
+  if (s.hiddenSpecialObjects !== undefined) {
+    if (!Array.isArray(s.hiddenSpecialObjects) || s.hiddenSpecialObjects.length > 10000
+      || !s.hiddenSpecialObjects.every(v => typeof v === 'string' && v.length <= 300)) invalid();
+    settings.hiddenSpecialObjects = [...s.hiddenSpecialObjects];
+  }
   const result = {
     version: 1, settings,
     camera: { position: [...c.position], target: [...c.target], centre: c.centre, fov: c.fov },

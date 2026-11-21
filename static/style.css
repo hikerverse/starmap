@@ -302,12 +302,18 @@ body.about-page { height: auto; min-height: 100%; overflow: auto; background: #0
 }
 #d-motion { max-width: 230px; white-space: normal; font-size: 12px; }
 .swatch.motion-incomplete { background: transparent !important; border: 1px solid #87909e; box-sizing: border-box; }
-#subspace-dialog {
+#special-objects-dialog, #subspace-dialog {
   position: fixed; top: 56px; left: 280px; right: auto; margin: 0; z-index: 11;
   box-sizing: border-box; width: min(380px, calc(100vw - 16px)); max-height: calc(100dvh - 72px);
   overflow: auto; padding: 14px; color: #dde6ff; background: #0a1020;
   border: 1px solid #3b4f8f; border-radius: 8px; font-size: 13px;
 }
+#special-objects-dialog .filter-heading { margin-bottom: 14px; }
+#special-objects-title { flex: 1; margin: 0; font-size: 17px; cursor: grab; touch-action: none; user-select: none; }
+#special-objects-title.dragging { cursor: grabbing; }
+#special-objects-list > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#special-objects-status { color: #f0d99b; }
+#special-objects-status:empty { display: none; }
 #subspace-dialog .filter-heading { margin-bottom: 14px; }
 #subspace-title { flex: 1; margin: 0; font-size: 17px; cursor: grab; touch-action: none; user-select: none; }
 #subspace-title.dragging { cursor: grabbing; }

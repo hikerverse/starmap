@@ -27,6 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CURATED_FILE = ROOT / "data" / "nebulae_curated.csv"
 OUT_FILE = ROOT / "data" / "nebulae.json"
+RADCLIFFE_MODEL_FILE = ROOT / "data" / "radcliffe_wave_best_fit_model_Konietzka2024.tab"
 TMP = Path(os.environ.get("TEMP", "/tmp"))
 VIZIER_HOSTS = ["vizier.cds.unistra.fr", "vizier.cfa.harvard.edu"]
 CATALOGUES = {
@@ -50,6 +51,13 @@ SIGHTLINE_RADIUS_DEG = 0.5      # angular radius represented by one Zucker sight
 PN_MORPH = {"E": "elliptical", "R": "round", "B": "bipolar", "I": "irregular", "S": "quasi-stellar",
             "A": "asymmetric", "P": "point-symmetric"}
 CLOUD_NAMES = {"Orion_Lam": "Lambda Orionis cloud", "CygnusX": "Cygnus X cloud", "Aquila_Rift": "Aquila Rift"}
+RADCLIFFE_SPINE_SPACING_PC = 20
+RADCLIFFE_SPINE_RADIUS_PC = 20
+EQ_TO_GAL = (
+    (-0.0548755604, -0.8734370902, -0.4838350155),
+    (0.4941094279, -0.4448296300, 0.7469822445),
+    (-0.8676661490, -0.1980763734, 0.4559837762),
+)
 
 
 def xyz(ra_deg: float, dec_deg: float, dist: float) -> tuple[float, float, float]:
@@ -171,6 +179,99 @@ def cloud_name(raw: str) -> str:
     return raw.replace("_", " ") + " cloud"
 
 
+def load_radcliffe_model(path: Path) -> list[tuple[float, float, float]]:
+    """Read the published best-fit centerline in heliocentric Galactic Cartesian coordinates."""
+    with path.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        if not reader.fieldnames or not {"x", "y", "z"}.issubset(reader.fieldnames):
+            raise ValueError(f"{path}: expected tab-separated x, y, z columns")
+        points = []
+        for line, row in enumerate(reader, start=2):
+            try:
+                point = tuple(float(row[axis]) for axis in ("x", "y", "z"))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{path}:{line}: invalid Galactic x, y, z coordinate") from exc
+            if not all(math.isfinite(value) for value in point):
+                raise ValueError(f"{path}:{line}: non-finite Galactic x, y, z coordinate")
+            points.append(point)
+    if len(points) < 2:
+        raise ValueError(f"{path}: expected at least two model coordinates")
+    return points
+
+
+def resample_polyline(points: list[tuple[float, float, float]], spacing: float) -> list[tuple[float, float, float]]:
+    """Resample an ordered 3D path at approximately equal arc-length intervals."""
+    if spacing <= 0:
+        raise ValueError("Polyline spacing must be positive")
+    distinct_points = [points[0]]
+    for point in points[1:]:
+        if point != distinct_points[-1]:
+            distinct_points.append(point)
+    points = distinct_points
+    if len(points) < 2:
+        raise ValueError("Polyline must have non-zero length")
+    cumulative = [0.0]
+    for previous, point in zip(points, points[1:]):
+        cumulative.append(cumulative[-1] + math.dist(previous, point))
+    total = cumulative[-1]
+    if total <= 0:
+        raise ValueError("Polyline must have non-zero length")
+    targets = [i * spacing for i in range(math.floor(total / spacing) + 1)]
+    if total - targets[-1] > 1e-6:
+        targets.append(total)
+
+    sampled = []
+    segment = 0
+    for target in targets:
+        while segment < len(points) - 2 and cumulative[segment + 1] < target:
+            segment += 1
+        start_distance, end_distance = cumulative[segment], cumulative[segment + 1]
+        fraction = (target - start_distance) / (end_distance - start_distance)
+        sampled.append(tuple(
+            points[segment][axis] + fraction * (points[segment + 1][axis] - points[segment][axis])
+            for axis in range(3)
+        ))
+    return sampled
+
+
+def galactic_to_equatorial_xyz(point: tuple[float, float, float]) -> tuple[float, float, float]:
+    """Convert heliocentric Galactic Cartesian coordinates to equatorial J2000."""
+    return tuple(
+        sum(EQ_TO_GAL[row][column] * point[row] for row in range(3))
+        for column in range(3)
+    )
+
+
+def radcliffe_wave(model_file: Path = RADCLIFFE_MODEL_FILE) -> dict:
+    """Build the Radcliffe Wave from its published 3D best-fit centerline."""
+    model = load_radcliffe_model(model_file)
+    spine = resample_polyline(model, RADCLIFFE_SPINE_SPACING_PC)
+    equatorial_spine = [galactic_to_equatorial_xyz(point) for point in spine]
+    cx = sum(p[0] for p in equatorial_spine) / len(equatorial_spine)
+    cy = sum(p[1] for p in equatorial_spine) / len(equatorial_spine)
+    cz = sum(p[2] for p in equatorial_spine) / len(equatorial_spine)
+    distance = math.sqrt(cx * cx + cy * cy + cz * cz)
+    ra = math.degrees(math.atan2(cy, cx)) % 360
+    dec = math.degrees(math.asin(cz / distance))
+    puffs = [
+        [round(x, 3), round(y, 3), round(z, 3), RADCLIFFE_SPINE_RADIUS_PC]
+        for x, y, z in equatorial_spine
+    ]
+    radius = max(math.dist((cx, cy, cz), p[:3]) + p[3] for p in puffs)
+    wave = entry(
+        "Radcliffe Wave", "molecular", ra, dec, distance, radius,
+        type="Molecular-cloud structure (published best-fit spine)",
+        ids="Konietzka+ 2024 best-fit model",
+        notes="Published 3D best-fit centerline, sampled every 20 pc from 1,500 Galactic-coordinate "
+              "model points. The displayed puff radius is illustrative; this model traces a centerline, "
+              "not a continuous gas volume.",
+        distance_ref="Konietzka+ 2024, Harvard Dataverse, doi:10.7910/DVN/F98QHY",
+        source="Konietzka+ 2024",
+    )
+    wave["puffs"] = puffs
+    return wave
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--offline", action="store_true", help="only use cached VizieR downloads")
@@ -267,6 +368,8 @@ def main() -> None:
         names.add(name)
         cloud_count += 1
 
+    entries.append(radcliffe_wave())
+
     data = {
         "units": "parsec",
         "frame": "Equatorial J2000, Sol at origin, +X towards RA 0h, +Z towards the north celestial pole",
@@ -274,11 +377,12 @@ def main() -> None:
             "data/nebulae_curated.csv (well-known nebulae; distance references per entry)",
             "González-Santamaría et al. 2021, A&A 656, A51: planetary nebulae with Gaia EDR3 central-star distances",
             "Zucker et al. 2020, A&A 633, A51: Gaia DR2 distances to molecular clouds (one puff per sightline)",
+            "data/radcliffe_wave_best_fit_model_Konietzka2024.tab: Konietzka et al. 2024, Harvard Dataverse doi:10.7910/DVN/F98QHY; published best-fit model in heliocentric Galactic Cartesian coordinates (CC0 1.0)",
         ],
-        "puffs_format": "[x, y, z, radius] in parsecs, equatorial J2000",
+        "puffs_format": "[x, y, z, radius] in parsecs, equatorial J2000; Radcliffe Wave puffs sample the published 3D best-fit centerline",
         "nebulae": entries,
     }
-    with OUT_FILE.open("w", encoding="utf-8") as f:
+    with OUT_FILE.open("w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
         f.write("\n")
     curated = sum(1 for e in entries if e["source"] == "curated")
